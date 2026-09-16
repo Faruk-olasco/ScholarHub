@@ -1,0 +1,32 @@
+name: Pull from a link
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: "Link(s) to pull scholarships from – one or more, separated by spaces"
+        required: true
+        type: string
+      save_as_source:
+        description: "Also save as a permanent source (included in every future crawl)"
+        type: boolean
+        default: true
+      deep:
+        description: "Deep pull – also follow links one level down (slower, finds more on big listing pages)"
+        type: boolean
+        default: false
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r crawler/requirements.txt
+      - name: Pull
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SAVE_AS_SOURCE: ${{ inputs.save_as_source && '1' || '0' }}
+          DEEP: ${{ inputs.deep && '1' || '0' }}
+        run: python crawler/pull.py ${{ inputs.urls }}
