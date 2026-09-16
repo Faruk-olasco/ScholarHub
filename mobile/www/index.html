@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>ScholarHub</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header id="top">
+  <div class="brand">🎓 Scholar<span>Hub</span></div>
+  <div class="live" id="live">● LIVE</div>
+</header>
+
+<div class="search">
+  <input id="q" type="search" placeholder="Search scholarships, e.g. PhD Canada, MBA fully funded…" enterkeyhint="search">
+  <button id="filtersBtn" aria-label="Filters">⚙︎</button>
+</div>
+
+<div class="chips" id="regionChips"></div>
+
+<div class="stats" id="stats"></div>
+
+<main id="list"><div class="loading">Loading opportunities…</div></main>
+<button id="more" class="more hidden">Load more</button>
+
+<div id="adSpacer" class="ad-spacer"></div>
+
+<!-- Filters sheet -->
+<div id="sheet" class="sheet hidden">
+  <div class="sheet-body">
+    <h3>Filters</h3>
+    <label>Level <select id="fLevel"><option value="">Any</option></select></label>
+    <label>Field <select id="fField"><option value="">Any</option></select></label>
+    <label>Funding <select id="fFunding"><option value="">Any</option></select></label>
+    <label>Source <select id="fTier"><option value="">All sources</option><option value="official">🏛 Official (schools & governments)</option><option value="web">🔎 Found via web search</option><option value="aggregator">Aggregators</option></select></label>
+    <label>Country <input id="fCountry" placeholder="e.g. Germany"></label>
+    <label class="row"><input type="checkbox" id="fExpired"> Include expired</label>
+    <div class="row gap">
+      <button id="clear" class="ghost">Clear</button>
+      <button id="apply">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail sheet -->
+<div id="detail" class="sheet hidden"><div class="sheet-body" id="detailBody"></div></div>
+
+<!-- Admin sheet (hidden; tap logo 7× + PIN) -->
+<div id="admin" class="sheet hidden">
+  <div class="sheet-body">
+    <h3>🛠 Admin — pull from a link</h3>
+    <p class="muted">Paste any scholarship page or RSS feed. It will be scraped on the next crawl (or run <b>Actions → Pull from a link</b> on GitHub for instant).</p>
+    <label>Link <input id="pUrl" type="url" placeholder="https://university.edu/scholarships"></label>
+    <label class="row"><input type="checkbox" id="pSave" checked> Save as permanent source</label>
+    <label class="row"><input type="checkbox" id="pDeep"> Deep pull (follow links one level down)</label>
+    <div class="row gap"><button id="pCancel" class="ghost">Close</button><button id="pQueue">Queue link</button></div>
+    <h4 style="margin:18px 0 6px">Recent pulls</h4>
+    <div id="pList" class="muted">—</div>
+    <h4 style="margin:18px 0 6px">Last crawls</h4>
+    <div id="pRuns" class="muted">—</div>
+  </div>
+</div>
+
+<!-- Alerts sheet -->
+<div id="alerts" class="sheet hidden">
+  <div class="sheet-body">
+    <h3>🔔 Get alerts</h3>
+    <p class="muted">We'll email or Telegram you when a matching scholarship appears.</p>
+    <label>Channel <select id="aChannel"><option value="email">Email</option><option value="telegram">Telegram chat ID</option></select></label>
+    <label>Address <input id="aAddress" placeholder="you@example.com"></label>
+    <label>Keywords <input id="aKeywords" placeholder="e.g. engineering, PhD"></label>
+    <label>Country <input id="aCountry" placeholder="optional"></label>
+    <div class="row gap"><button id="aCancel" class="ghost">Cancel</button><button id="aSave">Subscribe</button></div>
+  </div>
+</div>
+
+<nav class="tabs">
+  <button data-tab="all" class="on">All</button>
+  <button data-tab="soon">Closing soon</button>
+  <button data-tab="official">🏛 Official</button>
+  <button data-tab="saved">★ Saved</button>
+  <button id="alertsBtn">🔔</button>
+</nav>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
