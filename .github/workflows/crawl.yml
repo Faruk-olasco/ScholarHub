@@ -1,0 +1,29 @@
+name: Crawl scholarships
+on:
+  schedule:
+    - cron: "0 6,18 * * *"     # 06:00 and 18:00 UTC = 07:00 and 19:00 Lagos time
+  workflow_dispatch:           # "Run workflow" button for a manual refresh
+concurrency: { group: crawl, cancel-in-progress: false }
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r crawler/requirements.txt
+      - name: Run crawler
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BRAVE_PER_RUN: "6"
+          # optional alerts:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          python crawler/pull.py          # links queued from the app's admin screen
+          python crawler/run.py
