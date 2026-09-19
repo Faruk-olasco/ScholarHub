@@ -206,7 +206,7 @@ def resolve_link(link):
 
 def normalise(entry, source_name, fetch_full=False):
     title = clean_title(clean(entry.get("title")))
-    link = entry.get("link", "")
+    link = resolve_link(entry.get("link", ""))
     publisher, pub_domain = "", ""
     if source_name.startswith("Search:"):   # Google News
         if " - " in title:
