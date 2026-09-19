@@ -12,4 +12,4 @@ if ! grep -q '<queries>' "$MANIFEST"; then
   sed -i 's#</manifest>#    <queries>\n        <intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent>\n        <intent><action android:name="android.support.customtabs.action.CustomTabsService"/></intent>\n    </queries>\n</manifest>#' "$MANIFEST"
 fi
 grep -q 'android.permission.INTERNET' "$MANIFEST" || sed -i 's#<manifest #<manifest xmlns:tools="http://schemas.android.com/tools" #' "$MANIFEST"
-echo "Done. Now: npx cap sync android && cd android && ./gradlew assembleDigest"
+echo "Done. Now: npx cap sync android && cd android && ./gradlew assembleDebug"
