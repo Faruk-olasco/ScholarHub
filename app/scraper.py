@@ -190,23 +190,51 @@ def is_scholarship_like(title, body):
     return bool(re.search(r"(apply|application|eligib)", body[:800], re.I) and re.search(r"scholarship|fellowship|grant|funded", body[:800], re.I))
 
 
+_gn_cache = {}
+BAD_HOSTS = re.compile(r"googleusercontent\.com|gstatic\.com|google\.com/(?!url)|news\.google\.com|ggpht\.com", re.I)
+
+
+def is_good_url(u):
+    """A URL we are willing to store/show: http(s), not a Google asset, not an image."""
+    if not u or not u.startswith("http"): return False
+    if BAD_HOSTS.search(u): return False
+    if re.search(r"\.(png|jpe?g|gif|webp|svg|ico)(\?|$)", u, re.I): return False
+    return True
+
+
 def resolve_link(link):
-    """Google News RSS links are redirects; follow to the real article URL so dedupe works across sources."""
-    if "news.google.com" in link:
-        try:
-            r = _session.get(link, headers=BROWSER_HEADERS, timeout=(5, 10), allow_redirects=True)
-            if r.url and "news.google.com" not in r.url:
-                return r.url.split("?utm")[0]
-            m = re.search(r'href="(https?://(?!news\.google)[^"]+)"', r.text)
-            if m: return m.group(1)
-        except Exception:
-            pass
-    return link
+    """Decode a Google News RSS link into the real article URL (via Google's batchexecute endpoint).
+    Returns the decoded URL, or None if it cannot be resolved."""
+    if "news.google.com" not in link:
+        return link if is_good_url(link) else None
+    if link in _gn_cache:
+        return _gn_cache[link]
+    out = None
+    try:
+        import json as _json
+        m = re.search(r"/(?:articles|read)/([^/?]+)", link)
+        if m:
+            gid = m.group(1)
+            r = _session.get(f"https://news.google.com/articles/{gid}", headers=BROWSER_HEADERS, timeout=(5, 15))
+            sig = re.search(r'data-n-a-sg="([^"]+)"', r.text); ts = re.search(r'data-n-a-ts="([^"]+)"', r.text)
+            if sig and ts:
+                req = [["Fbv4je", _json.dumps(["garturlreq", [["X", "X", ["X", "X"], None, None, 1, 1, "US:en", None, 1, None, None, None, None, None, 0, 1],
+                        "X", "X", 1, [1, 1, 1], 1, 1, None, 0, 0, None, 0], gid, ts.group(1), sig.group(1)]), None, "generic"]]
+                resp = _session.post("https://news.google.com/_/DotsSplashUi/data/batchexecute",
+                                     headers={**BROWSER_HEADERS, "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"},
+                                     data={"f.req": _json.dumps([req])}, timeout=(5, 15))
+                mm = re.search(r'\\"(https?://[^\\"]+)\\"', resp.text)
+                if mm and is_good_url(mm.group(1)):
+                    out = mm.group(1).split("?utm")[0]
+    except Exception as e:
+        log.debug("gnews decode failed: %s", e)
+    _gn_cache[link] = out
+    return out
 
 
 def normalise(entry, source_name, fetch_full=False):
     title = clean_title(clean(entry.get("title")))
-    link = resolve_link(entry.get("link", ""))
+    link = entry.get("link", "")
     publisher, pub_domain = "", ""
     if source_name.startswith("Search:"):   # Google News
         if " - " in title:
@@ -215,7 +243,9 @@ def normalise(entry, source_name, fetch_full=False):
         pub_domain = urlparse(src.get("href", "") if isinstance(src, dict) else "").netloc.replace("www.", "")
         publisher = clean(publisher) or pub_domain or "web"
         source_name = f"🔎 {publisher}"
-        fetch_full = False   # GN hides the article URL; we rely on title/snippet
+        link = resolve_link(link)          # decode to the real article URL
+        if not link:
+            return None                    # never store an unresolved / image URL
     elif source_name.startswith("Web:"):     # Brave
         pub_domain = urlparse(link).netloc.replace("www.", "")
         publisher = pub_domain
@@ -225,7 +255,7 @@ def normalise(entry, source_name, fetch_full=False):
         raw = entry["content"][0].get("value", "")
     raw = raw or entry.get("summary", "") or entry.get("description", "")
     body = clean(raw)
-    if not title or not link or not is_scholarship_like(title, body):
+    if not title or not is_good_url(link) or not is_scholarship_like(title, body):
         return None
     if publisher and not is_applyable(title, body):   # search results: must be an actionable opportunity, not news about one
         return None
@@ -336,9 +366,7 @@ def harvest_html(html_text, base_url, source_name, known_urls=(), detail_limit=6
         href = urljoin(base_url, a["href"]).split("#")[0]
         if len(text) < 12 or len(text) > 160 or not LINK_RE.search(text) or SKIP_RE.search(text):
             continue
-        if href in seen or href.rstrip("/") == base_url.rstrip("/") or not href.startswith("http"):
-            continue
-        if re.search(r"\.(jpg|jpeg|png|gif|webp|svg)(\?|$)", href, re.I) or "googleusercontent.com" in href or "gravatar.com" in href:
+        if href in seen or href.rstrip("/") == base_url.rstrip("/") or not is_good_url(href) or "gravatar.com" in href:
             continue
         seen.add(href)
         body = ""
