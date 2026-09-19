@@ -338,6 +338,8 @@ def harvest_html(html_text, base_url, source_name, known_urls=(), detail_limit=6
             continue
         if href in seen or href.rstrip("/") == base_url.rstrip("/") or not href.startswith("http"):
             continue
+        if re.search(r"\.(jpg|jpeg|png|gif|webp|svg)(\?|$)", href, re.I) or "googleusercontent.com" in href or "gravatar.com" in href:
+            continue
         seen.add(href)
         body = ""
         if href not in known_urls and fetched < detail_limit:
