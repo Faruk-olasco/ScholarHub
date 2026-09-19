@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
       - run: npm install
       - run: npx cap add android
       - run: ADMOB_APP_ID="${{ secrets.ADMOB_APP_ID }}" ./setup-android.sh
@@ -26,16 +28,4 @@ jobs:
       - name: Build signed release AAB (for Google Play) if keystore secret exists
         if: ${{ env.HAS_KEYSTORE == 'true' }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
-          cd android && ./gradlew bundleRelease assembleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file=$PWD/app/release.keystore \
-            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
-            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
-            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: scholarhub-android
-          path: |
-            mobile/android/app/build/outputs/apk/debug/*.apk
-            mobile/android/app/build/outputs/apk/release/*.apk
-            mobile/android/app/build/outputs/bundle/release/*.aab
+          echo
