@@ -1,4 +1,4 @@
-/* ScholarHub mobile – vanilla JS, talks to the FastAPI server, AdMob via Capacitor plugin. */
+/* ScholarHub mobile – vanilla JS, talks to Supabase, AdMob via Capacitor plugin. */
 const SB_URL = (window.SUPABASE_URL || "").replace(/\/$/, "") + "/rest/v1";
 const SB_HEADERS = { apikey: window.SUPABASE_ANON_KEY, Authorization: "Bearer " + window.SUPABASE_ANON_KEY, Accept: "application/json" };
 const FILTERS = {
@@ -12,6 +12,22 @@ const isNative = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
 const AdMob = Cap && Cap.Plugins && Cap.Plugins.AdMob;
 const Browser = Cap && Cap.Plugins && Cap.Plugins.Browser;
 const Share = Cap && Cap.Plugins && Cap.Plugins.Share;
+
+async function openUrl(url) {
+  if (!url) return;
+  try { if (Browser && Browser.open) { await Browser.open({ url, presentationStyle: "popover" }); return; } } catch (e) { console.warn("Browser plugin failed", e); }
+  // Fallbacks: real anchor click (works in WebView) then window.open / location
+  try {
+    const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); return;
+  } catch (e) {}
+  const w = window.open(url, "_blank"); if (!w) location.href = url;
+}
+async function shareItem(i) {
+  const text = i.title + (i.deadline ? " · Deadline " + i.deadline : "") + "\n" + i.url;
+  try { if (Share && Share.share) return await Share.share({ title: i.title, text, url: i.url, dialogTitle: "Share scholarship" }); } catch (e) {}
+  try { if (navigator.share) return await navigator.share({ title: i.title, text, url: i.url }); } catch (e) {}
+  try { await navigator.clipboard.writeText(text); alert("Link copied"); } catch (e) { prompt("Copy link", i.url); }
+}
 
 const $ = (s) => document.querySelector(s);
 const state = { tab: "all", region: "", q: "", level: "", field: "", funding: "", tier: "", country: "", expired: 0, offset: 0, items: [], total: 0, detailOpens: 0 };
@@ -113,11 +129,11 @@ function render() {
     ${idx > 0 && idx % 8 === 0 && !isNative ? '<div class="ad-card">Advertisement</div>' : ""}
     <div class="card" data-id="${esc(i.id)}">
       <button class="star ${saved.has(i.id) ? "on" : ""}" data-star="${esc(i.id)}">★</button>
-      <h3>${esc(i.title)}</h3>
+      <h3><a href="${esc(i.url)}" data-open="${esc(i.url)}">${esc(i.title)}</a></h3>
       ${deadlineHtml(i.deadline)}
       <p>${esc(i.summary)}</p>
       ${tags(i)}
-      <div class="meta">via ${esc(i.source)} · ${esc((i.published || "").slice(0, 10))}</div>
+      <div class="meta"><span>via ${esc(i.source)} · ${esc((i.published || "").slice(0, 10))}</span><button class="open" data-open="${esc(i.url)}">Open ↗</button></div>
     </div>`).join("");
   $("#more").classList.toggle("hidden", state.tab === "saved" || state.offset >= state.total);
   $("#stats").textContent = `${state.total.toLocaleString()} opportunities${state.region ? " · " + state.region : ""}`;
@@ -129,14 +145,16 @@ function openDetail(i) {
     <h2>${esc(i.title)}</h2>${deadlineHtml(i.deadline)}${tags(i)}
     <p>${esc(i.summary)}</p>
     <div class="muted">Source: ${esc(i.source)}</div>
+    <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#38bdf8">${esc(i.url)}</a></div>
     <div class="actions">
       <button class="ghost" id="dSave">${saved.has(i.id) ? "★ Saved" : "☆ Save"}</button>
       <button class="ghost" id="dShare">Share</button>
       <button id="dOpen">Apply / Details ↗</button>
     </div></div>`;
   $("#detail").classList.remove("hidden");
-  $("#dOpen").onclick = () => (Browser ? Browser.open({ url: i.url }) : window.open(i.url, "_blank"));
-  $("#dShare").onclick = () => (Share ? Share.share({ title: i.title, text: i.title + (i.deadline ? " · Deadline " + i.deadline : ""), url: i.url }) : navigator.share && navigator.share({ title: i.title, url: i.url }));
+  $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
+  $("#dOpen").onclick = () => openUrl(i.url);
+  $("#dShare").onclick = () => shareItem(i);
   $("#dSave").onclick = () => { toggleSave(i); $("#dSave").textContent = saved.has(i.id) ? "★ Saved" : "☆ Save"; };
 }
 function toggleSave(i) {
@@ -147,6 +165,8 @@ function toggleSave(i) {
 
 // ---------- events ----------
 $("#list").addEventListener("click", (e) => {
+  const open = e.target.closest("[data-open]");
+  if (open) { e.preventDefault(); openUrl(open.dataset.open); return; }
   const star = e.target.closest("[data-star]");
   if (star) { const i = state.items.find((x) => x.id === star.dataset.star); if (i) toggleSave(i); return; }
   const card = e.target.closest(".card"); if (!card) return;
