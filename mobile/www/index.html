@@ -8,13 +8,14 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
+<div id="ptr">↓ Pull to refresh</div>
 <header id="top">
   <div class="brand">🎓 Scholar<span>Hub</span></div>
-  <div class="live" id="live">● LIVE</div>
+  <div class="hdr-right"><button id="refreshBtn" aria-label="Refresh">↻</button><div class="live" id="live">● LIVE</div></div>
 </header>
 
 <div class="search">
-  <input id="q" type="search" placeholder="Search scholarships, e.g. PhD Canada, MBA fully funded…" enterkeyhint="search">
+  <div class="qwrap"><input id="q" type="search" placeholder="Search scholarships, e.g. PhD Canada…" enterkeyhint="search"><button id="searchBtn" aria-label="Search">🔍</button></div>
   <button id="filtersBtn" aria-label="Filters">⚙︎</button>
 </div>
 
