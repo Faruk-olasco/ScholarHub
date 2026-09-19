@@ -8,6 +8,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: mobile } }
+    env:
+      HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,7 +24,7 @@ jobs:
       - name: Build debug APK (installable for testing)
         run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
       - name: Build signed release AAB (for Google Play) if keystore secret exists
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: ${{ env.HAS_KEYSTORE == 'true' }}
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
           cd android && ./gradlew bundleRelease assembleRelease --no-daemon \
