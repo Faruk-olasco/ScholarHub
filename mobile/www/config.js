@@ -3,8 +3,8 @@
 // 1) SUPABASE. From your Supabase project: Settings → API.
 //    Use the "anon public" key here (it is safe to ship in the app; Row Level Security limits it to read-only).
 //    NEVER put the service_role key in the app.
-window.SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
-window.SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
+window.SUPABASE_URL = "https://bmoicxrcyxbssgkfzahu.supabase.co";
+window.SUPABASE_ANON_KEY = "sb_publishable_qI60qVcNwEW6DUN4Bdztjw_lJaeuijY";
 
 // 2) ADMOB. These are Google's official TEST IDs – safe during development (they show "Test Ad" banners).
 //    Replace with your own IDs from https://apps.admob.com before publishing, and set testing:false.
