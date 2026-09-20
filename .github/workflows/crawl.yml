@@ -1,7 +1,8 @@
 name: Crawl scholarships
 on:
   schedule:
-    - cron: "0 6,18 * * *"     # 06:00 and 18:00 UTC = 07:00 and 19:00 Lagos time
+    #- cron: "0 6,18 * * *"     # 06:00 and 18:00 UTC = 07:00 and 19:00 Lagos time
+    - cron: "17 6,18 * * *"    # 06:17 & 18:17 UTC = 07:17 & 19:17 Lagos
   workflow_dispatch:           # "Run workflow" button for a manual refresh
 concurrency: { group: crawl, cancel-in-progress: false }
 jobs:
