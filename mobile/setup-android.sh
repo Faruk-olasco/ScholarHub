@@ -11,5 +11,29 @@ fi
 if ! grep -q '<queries>' "$MANIFEST"; then
   sed -i 's#</manifest>#    <queries>\n        <intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent>\n        <intent><action android:name="android.support.customtabs.action.CustomTabsService"/></intent>\n    </queries>\n</manifest>#' "$MANIFEST"
 fi
+# Deep links: open https://<SHARE_HOST>/scholarhub/?s=<id> in the app (SHARE_HOST = your GitHub Pages host, e.g. username.github.io)
+SHARE_HOST="${SHARE_HOST:-}"
+if [ -n "$SHARE_HOST" ] && ! grep -q 'android:host="'"$SHARE_HOST"'"' "$MANIFEST"; then
+  python3 - "$MANIFEST" "$SHARE_HOST" <<'PY'
+import re,sys
+p,host=sys.argv[1],sys.argv[2]; s=open(p).read()
+f=f"""
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="{host}" android:pathPrefix="/scholarhub"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="scholarhub"/>
+            </intent-filter>
+        </activity>"""
+s=re.sub(r"(<activity[^>]*MainActivity[\s\S]*?)</activity>", lambda m:m.group(1)+f, s, count=1)
+open(p,"w").write(s); print("deep-link intent filters added for", host)
+PY
+fi
 grep -q 'android.permission.INTERNET' "$MANIFEST" || sed -i 's#<manifest #<manifest xmlns:tools="http://schemas.android.com/tools" #' "$MANIFEST"
 echo "Done. Now: npx cap sync android && cd android && ./gradlew assembleDebug"
