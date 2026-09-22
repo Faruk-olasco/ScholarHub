@@ -17,8 +17,8 @@ window.ADMOB = {
 };
 
 // 3) Links shown in the app
-window.SHARE_URL = "https://faruk-olasco.github.io/scholarhub";
-window.PRIVACY_URL = "https://faruk-olasco.github.io/scholarhub/privacy.html";
+window.SHARE_URL = "https://faruk-olasco.github.io/ScholarHub";
+window.PRIVACY_URL = "https://faruk-olasco.github.io/ScholarHub/privacy.html";
 
 // 4) ADMIN. Tap the ScholarHub logo 7 times and enter this PIN to open the admin screen
 //    (pull scholarships from a link, see crawl status). Change it!
