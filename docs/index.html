@@ -1,10 +1,27 @@
-<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>ScholarHub app</title>
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>ScholarHub</title>
 <style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif;text-align:center;padding:20px}
-h1{font-size:34px;margin:10px 0}h1 span{color:#38bdf8}p{color:#94a3b8;max-width:420px}.b,.b2{display:block;margin:12px auto;padding:14px 28px;border-radius:12px;background:#38bdf8;color:#0f172a;font-weight:700;text-decoration:none;max-width:280px}.b2{background:#1e293b;color:#e2e8f0}</style></head>
+h1{font-size:34px;margin:10px 0}h1 span{color:#38bdf8}p{color:#94a3b8;max-width:420px;margin:8px auto}.b,.b2{display:block;margin:12px auto;padding:14px 28px;border-radius:12px;background:#38bdf8;color:#0f172a;font-weight:700;text-decoration:none;max-width:300px}.b2{background:#1e293b;color:#e2e8f0}
+.card{background:#1e293b;border:1px solid #273449;border-radius:14px;padding:16px;max-width:420px;margin:16px auto;text-align:left}.card h2{font-size:17px;margin:0 0 6px;line-height:1.35}.dl{font-size:13px;color:#34d399;font-weight:600}.card p{font-size:13px;color:#94a3b8;margin:8px 0 0}</style></head>
 <body><div><div style="font-size:64px">🎓</div><h1>Scholar<span>Hub</span></h1>
-<p>Scholarships, fellowships and grants from universities and governments worldwide — in your pocket.</p>
-<!-- When published on Google Play, replace # with your Play Store link -->
-<a class=b href="#">Get it on Google Play (coming soon)</a>
-<!-- Direct APK: upload the APK as a GitHub Release and paste the link -->
-<a class=b2 href="APK_LINK_HERE">Download APK</a>
-<p style="font-size:12px"><a href="privacy.html" style="color:#64748b">Privacy policy</a></p></div></body></html>
+<div id="item"></div>
+<p id="tag">Scholarships, fellowships and grants from universities and governments worldwide — in your pocket.</p>
+<a class=b id="openApp" href="#" style="display:none">Open in the app</a>
+<a class=b2 id="store" href="#">Get it on Google Play</a>
+<p style="font-size:12px"><a href="privacy.html" style="color:#64748b">Privacy policy</a></p></div>
+<script>
+// After publishing, put your Play Store link here, e.g. "https://play.google.com/store/apps/details?id=com.scholarhub.app"
+const PLAY_STORE_URL = "";
+const store = document.getElementById("store");
+if (PLAY_STORE_URL) store.href = PLAY_STORE_URL; else { store.textContent = "Google Play — coming soon"; store.style.opacity = ".6"; }
+const SUPABASE_URL = "https://bmoicxrcyxbssgkfzahu.supabase.co", SUPABASE_ANON_KEY = "sb_publishable_qI60qVcNwEW6DUN4Bdztjw_lJaeuijY";
+const id = new URLSearchParams(location.search).get("s");
+const esc = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+if (id) {
+  const a = document.getElementById("openApp"); a.style.display = "block"; a.href = "scholarhub://open?s=" + encodeURIComponent(id);
+  setTimeout(() => { location.href = a.href; }, 400);
+  fetch(SUPABASE_URL + "/rest/v1/scholarships?select=title,summary,deadline,url,source&id=eq." + encodeURIComponent(id), { headers: { apikey: SUPABASE_ANON_KEY } })
+    .then((r) => r.json()).then((rows) => { const i = rows[0]; if (!i) return;
+      document.getElementById("tag").textContent = "Shared from the ScholarHub app";
+      document.getElementById("item").innerHTML = `<div class="card"><h2>${esc(i.title)}</h2><div class="dl">${i.deadline ? "⏰ Deadline " + esc(i.deadline) : "🟢 Open — no deadline stated"}</div><p>${esc((i.summary || "").slice(0, 300))}</p><p><a href="${esc(i.url)}" style="color:#38bdf8">View original listing ↗</a></p></div>`; }).catch(() => {});
+}
+</script></body></html>
