@@ -12,6 +12,9 @@ const isNative = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
 const AdMob = Cap && Cap.Plugins && Cap.Plugins.AdMob;
 const Browser = Cap && Cap.Plugins && Cap.Plugins.Browser;
 const Share = Cap && Cap.Plugins && Cap.Plugins.Share;
+const CapApp = Cap && Cap.Plugins && Cap.Plugins.App;
+const SHARE_BASE = (window.SHARE_URL || "").replace(/\/$/, "");
+const shareLink = (i) => (SHARE_BASE ? SHARE_BASE + "/?s=" + encodeURIComponent(i.id) : i.url);
 
 async function openUrl(url) {
   if (!url) return;
@@ -23,11 +26,20 @@ async function openUrl(url) {
   const w = window.open(url, "_blank"); if (!w) location.href = url;
 }
 async function shareItem(i) {
-  const text = i.title + (i.deadline ? " · Deadline " + i.deadline : "") + "\n" + i.url;
-  try { if (Share && Share.share) return await Share.share({ title: i.title, text, url: i.url, dialogTitle: "Share scholarship" }); } catch (e) {}
-  try { if (navigator.share) return await navigator.share({ title: i.title, text, url: i.url }); } catch (e) {}
-  try { await navigator.clipboard.writeText(text); alert("Link copied"); } catch (e) { prompt("Copy link", i.url); }
+  const link = shareLink(i);
+  const text = "🎓 " + i.title + (i.deadline ? " · Deadline " + i.deadline : "") + "\nView in ScholarHub: " + link;
+  try { if (Share && Share.share) return await Share.share({ title: i.title, text, url: link, dialogTitle: "Share scholarship" }); } catch (e) {}
+  try { if (navigator.share) return await navigator.share({ title: i.title, text, url: link }); } catch (e) {}
+  try { await navigator.clipboard.writeText(text); alert("Link copied"); } catch (e) { prompt("Copy link", link); }
 }
+// Deep link: open a specific scholarship by id (from a shared link)
+async function openById(id) {
+  if (!id) return;
+  let i = state.items.find((x) => x.id === id) || savedItems[id];
+  if (!i) { try { i = (await api("/scholarships?select=id,title,url,source,summary,published,deadline,countries,regions,levels,fields,funding,tier&id=eq." + encodeURIComponent(id))).items[0]; } catch (e) {} }
+  if (i) openDetail(i); else alert("This scholarship is no longer listed.");
+}
+function idFromUrl(u) { try { return new URL(u).searchParams.get("s"); } catch (e) { return null; } }
 
 const $ = (s) => document.querySelector(s);
 const state = { tab: "all", region: "", q: "", level: "", field: "", funding: "", tier: "", country: "", expired: 0, offset: 0, items: [], total: 0, detailOpens: 0 };
@@ -250,6 +262,13 @@ async function init() {
     document.querySelectorAll(".chip").forEach((c) => (c.onclick = () => { document.querySelectorAll(".chip").forEach((x) => x.classList.remove("on")); c.classList.add("on"); state.region = c.dataset.region; load(); }));
   } catch (e) {}
   load();
+  // deep links: app opened from a shared link (native) or web URL with ?s=<id>
+  const startId = idFromUrl(location.href);
+  if (startId) setTimeout(() => openById(startId), 300);
+  if (CapApp && CapApp.addListener) {
+    CapApp.addListener("appUrlOpen", (ev) => { const id = idFromUrl(ev.url); if (id) openById(id); });
+    try { CapApp.getLaunchUrl().then((r) => { const id = r && r.url && idFromUrl(r.url); if (id) openById(id); }).catch(() => {}); } catch (e) {}
+  }
   // refresh when a new crawl has landed (twice a day) – check every 10 min while the app is open
   let lastRun = null;
   setInterval(async () => { try { const s = (await api("/app_stats?select=last_run")).items[0]; if (lastRun && s.last_run !== lastRun && state.tab === "all" && !state.q) load(); lastRun = s.last_run; } catch (e) {} }, 600000);
