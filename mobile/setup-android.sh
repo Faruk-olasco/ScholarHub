@@ -11,7 +11,7 @@ fi
 if ! grep -q '<queries>' "$MANIFEST"; then
   sed -i 's#</manifest>#    <queries>\n        <intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent>\n        <intent><action android:name="android.support.customtabs.action.CustomTabsService"/></intent>\n    </queries>\n</manifest>#' "$MANIFEST"
 fi
-# Deep links: open https://<SHARE_HOST>/scholarhub/?s=<id> in the app (SHARE_HOST = your GitHub Pages host, e.g. username.github.io)
+# Deep links: open https://<SHARE_HOST>/ScholarHub/?s=<id> in the app (SHARE_HOST = your GitHub Pages host, e.g. username.github.io)
 SHARE_HOST="${SHARE_HOST:-}"
 if [ -n "$SHARE_HOST" ] && ! grep -q 'android:host="'"$SHARE_HOST"'"' "$MANIFEST"; then
   python3 - "$MANIFEST" "$SHARE_HOST" <<'PY'
@@ -35,5 +35,12 @@ s=re.sub(r"(<activity[^>]*MainActivity[\s\S]*?)</activity>", lambda m:m.group(1)
 open(p,"w").write(s); print("deep-link intent filters added for", host)
 PY
 fi
+# Version: versionCode must increase for every Play Store upload. Uses the GitHub run number (always increasing),
+# versionName is human-readable (from mobile/package.json "version").
+GRADLE=android/app/build.gradle
+VCODE="${VERSION_CODE:-1}"
+VNAME="${VERSION_NAME:-1.0.0}"
+sed -i "s/versionCode [0-9]*/versionCode $VCODE/; s/versionName \"[^\"]*\"/versionName \"$VNAME\"/" "$GRADLE"
+echo "Version: $VNAME ($VCODE)"
 grep -q 'android.permission.INTERNET' "$MANIFEST" || sed -i 's#<manifest #<manifest xmlns:tools="http://schemas.android.com/tools" #' "$MANIFEST"
 echo "Done. Now: npx cap sync android && cd android && ./gradlew assembleDebug"
