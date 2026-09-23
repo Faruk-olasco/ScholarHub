@@ -22,7 +22,8 @@ jobs:
       - run: npm install
       - run: npx cap add android
       #- run: chmod +x setup-android.sh && ADMOB_APP_ID="${{ secrets.ADMOB_APP_ID }}" ./setup-android.sh
-      - run: chmod +x setup-android.sh && ADMOB_APP_ID="${{ secrets.ADMOB_APP_ID }}" SHARE_HOST="${{ secrets.SHARE_HOST }}" ./setup-android.sh
+      #- run: chmod +x setup-android.sh && ADMOB_APP_ID="${{ secrets.ADMOB_APP_ID }}" SHARE_HOST="${{ secrets.SHARE_HOST }}" ./setup-android.sh
+      - run: chmod +x setup-android.sh && ADMOB_APP_ID="${{ secrets.ADMOB_APP_ID }}" SHARE_HOST="${{ secrets.SHARE_HOST }}" VERSION_CODE="${{ github.run_number }}" VERSION_NAME="$(node -p "require('./package.json').version")" ./setup-android.sh
       - run: npx cap sync android
       - name: Build debug APK (installable for testing)
         run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
