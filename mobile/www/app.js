@@ -79,7 +79,7 @@ const like = (v) => "ilike.*" + v.replace(/[%*,()]/g, " ").trim() + "*";
 function buildQuery(offset) {
   const p = new URLSearchParams();
   p.set("select", "id,title,url,source,summary,published,deadline,countries,regions,levels,fields,funding,tier");
-  if (state.q) { const q = state.q.replace(/[%*,()]/g, " ").trim(); p.set("and", `(or(title.ilike.*${q}*,summary.ilike.*${q}*))`); }
+  if (state.q) { const q = state.q.replace(/[%*,()."'\\:&|!<>]/g, " ").replace(/\s+/g, " ").trim(); if (q) p.set("and", `(or(title.wfts(english).${q},summary.wfts(english).${q}))`); }
   if (state.region) p.set("regions", like(state.region));
   if (state.level) p.set("levels", like(state.level));
   if (state.field) p.set("fields", like(state.field));
@@ -100,16 +100,20 @@ async function api(path, extraHeaders = {}) {
   const data = await r.json();
   return { items: data, total: total && total !== "*" ? +total : data.length };
 }
+let loadSeq = 0;
 async function load(reset = true) {
+  const seq = ++loadSeq; // ignore responses from older requests (fixes unrelated results while typing)
   if (reset) { state.offset = 0; state.items = []; $("#list").innerHTML = '<div class="loading">Loading opportunities…</div>'; }
   if (state.tab === "saved") { state.items = Object.values(savedItems); state.total = state.items.length; render(); return; }
   try {
     const data = await api(buildQuery(state.offset), { Prefer: "count=exact" });
+    if (seq !== loadSeq) return;
     const items = data.items;
     state.items = state.items.concat(items); state.total = data.total; state.offset += data.items.length;
     localStorage.setItem("cache:" + buildQuery(0), JSON.stringify({ items: state.items.slice(0, 60), total: data.total, t: Date.now() }));
     render(); setOffline(false);
   } catch (e) {
+    if (seq !== loadSeq) return;
     const c = JSON.parse(localStorage.getItem("cache:" + buildQuery(0)) || "null");
     if (c) { state.items = c.items; state.total = c.total; render(); }
     else $("#list").innerHTML = '<div class="empty">Could not reach the server.<br>Check your internet connection.</div>';
