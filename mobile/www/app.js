@@ -45,6 +45,17 @@ const $ = (s) => document.querySelector(s);
 const state = { tab: "all", region: "", q: "", level: "", field: "", funding: "", tier: "", country: "", expired: 0, offset: 0, items: [], total: 0, detailOpens: 0 };
 const saved = new Set(JSON.parse(localStorage.getItem("saved") || "[]"));
 const savedItems = JSON.parse(localStorage.getItem("savedItems") || "{}");
+// My Plan: personal to-do list + per-scholarship notes (stored on the phone only)
+const plan = JSON.parse(localStorage.getItem("plan") || "[]");
+const notes = JSON.parse(localStorage.getItem("notes") || "{}");
+const savePlan = () => { localStorage.setItem("plan", JSON.stringify(plan)); localStorage.setItem("notes", JSON.stringify(notes)); };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+function addTask(text, due, item) {
+  text = (text || "").trim(); if (!text) return;
+  plan.unshift({ id: uid(), text, due: due || "", done: false, sid: item ? item.id : "", stitle: item ? item.title : "", created: Date.now() });
+  if (item && !savedItems[item.id]) savedItems[item.id] = item;
+  savePlan();
+}
 
 // ---------- AdMob ----------
 async function initAds() {
@@ -105,6 +116,7 @@ async function load(reset = true) {
   const seq = ++loadSeq; // ignore responses from older requests (fixes unrelated results while typing)
   if (reset) { state.offset = 0; state.items = []; $("#list").innerHTML = '<div class="loading">Loading opportunities…</div>'; }
   if (state.tab === "saved") { state.items = Object.values(savedItems); state.total = state.items.length; render(); return; }
+  if (state.tab === "plan") { renderPlan(); return; }
   try {
     const data = await api(buildQuery(state.offset), { Prefer: "count=exact" });
     if (seq !== loadSeq) return;
@@ -161,6 +173,25 @@ function render() {
   $("#stats").textContent = `${state.total.toLocaleString()} opportunities${state.region ? " · " + state.region : ""}`;
   api("/app_stats?select=last_run").then((r) => { const t = r.items[0] && r.items[0].last_run; if (t) $("#stats").textContent += ` · updated ${new Date(t).toLocaleString([], { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`; }).catch(() => {});
 }
+function renderPlan() {
+  const list = $("#list"); $("#more").classList.add("hidden");
+  const open = plan.filter((t) => !t.done), done = plan.filter((t) => t.done);
+  $("#stats").textContent = `${open.length} to do · ${done.length} done`;
+  const dueTxt = (d) => { if (!d) return ""; const days = Math.round((new Date(d) - new Date().setHours(0, 0, 0, 0)) / 864e5); return `<span class="${days < 0 ? "dl past" : days <= 3 ? "dl soon" : ""}">📅 ${d}${days < 0 ? " (overdue)" : days === 0 ? " (today)" : days > 0 && days <= 14 ? ` (${days}d)` : ""}</span>`; };
+  const row = (t) => `<div class="task ${t.done ? "done" : ""}" data-task="${t.id}">
+      <input type="checkbox" data-done="${t.id}" ${t.done ? "checked" : ""}>
+      <div class="body"><div class="txt">${esc(t.text)}</div>
+        <div class="sub">${dueTxt(t.due)}${t.sid ? `${t.due ? " · " : ""}🎓 <a href="#" data-goto="${esc(t.sid)}">${esc(t.stitle).slice(0, 60)}</a>` : ""}</div></div>
+      <button class="del" data-del="${t.id}" aria-label="Delete">✕</button></div>`;
+  list.innerHTML = `<div class="plan-add">
+      <textarea id="tText" placeholder="What are you working on? e.g. Request transcript for DAAD application, write motivation letter…"></textarea>
+      <div class="row"><input type="date" id="tDue" aria-label="Due date"><button id="tAdd">＋ Add</button></div></div>
+    ${plan.length ? "" : '<div class="empty">Your plan is empty.<br>Add tasks here, or open any scholarship and tap "Add to plan".</div>'}
+    ${open.length ? '<div class="plan-h">To do</div>' + open.map(row).join("") : ""}
+    ${done.length ? '<div class="plan-h">Done</div>' + done.map(row).join("") : ""}`;
+  $("#tAdd").onclick = () => { addTask($("#tText").value, $("#tDue").value); renderPlan(); };
+  $("#tText").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#tAdd").click(); } };
+}
 function openDetail(i) {
   maybeInterstitial();
   $("#detailBody").innerHTML = `<div class="detail">
@@ -172,13 +203,19 @@ function openDetail(i) {
       <button class="ghost" id="dSave">${saved.has(i.id) ? "★ Saved" : "☆ Save"}</button>
       <button class="ghost" id="dShare">Share</button>
       <button id="dOpen">Apply / Details ↗</button>
-    </div></div>`;
+    </div>
+    <div class="muted" style="margin-top:16px">📝 My notes for this scholarship</div>
+    <textarea class="note" id="dNote" placeholder="e.g. Need 2 reference letters, IELTS 6.5, submit before 15 March…">${esc(notes[i.id] || "")}</textarea>
+    <div class="row" style="justify-content:space-between;margin-top:6px"><span class="muted" id="dNoteSaved">${planCount(i.id)}</span><button class="ghost" id="dPlan">＋ Add to plan</button></div></div>`;
   $("#detail").classList.remove("hidden");
   $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
   $("#dOpen").onclick = () => openUrl(i.url);
   $("#dShare").onclick = () => shareItem(i);
   $("#dSave").onclick = () => { toggleSave(i); $("#dSave").textContent = saved.has(i.id) ? "★ Saved" : "☆ Save"; };
+  let nt; $("#dNote").oninput = (e) => { clearTimeout(nt); nt = setTimeout(() => { const v = e.target.value.trim(); if (v) notes[i.id] = v; else delete notes[i.id]; if (v && !savedItems[i.id]) { savedItems[i.id] = i; saved.add(i.id); localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems)); } savePlan(); $("#dNoteSaved").textContent = "Saved ✓"; }, 500); };
+  $("#dPlan").onclick = () => { const text = prompt("Task for “" + i.title.slice(0, 40) + "…”", "Apply: " + i.title.slice(0, 60)); if (text === null) return; addTask(text, i.deadline || "", i); $("#dNoteSaved").textContent = planCount(i.id) + " · added ✓"; };
 }
+function planCount(sid) { const n = plan.filter((t) => t.sid === sid && !t.done).length; return n ? `${n} open task${n > 1 ? "s" : ""} in plan` : "Notes save automatically"; }
 function toggleSave(i) {
   if (saved.has(i.id)) { saved.delete(i.id); delete savedItems[i.id]; } else { saved.add(i.id); savedItems[i.id] = i; }
   localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems));
@@ -187,6 +224,12 @@ function toggleSave(i) {
 
 // ---------- events ----------
 $("#list").addEventListener("click", (e) => {
+  const dn = e.target.closest("[data-done]");
+  if (dn) { const t = plan.find((x) => x.id === dn.dataset.done); if (t) { t.done = dn.checked; savePlan(); setTimeout(renderPlan, 250); } return; }
+  const del = e.target.closest("[data-del]");
+  if (del) { const k = plan.findIndex((x) => x.id === del.dataset.del); if (k > -1 && confirm("Delete this task?")) { plan.splice(k, 1); savePlan(); renderPlan(); } return; }
+  const go = e.target.closest("[data-goto]");
+  if (go) { e.preventDefault(); openById(go.dataset.goto); return; }
   const open = e.target.closest("[data-open]");
   if (open) { e.preventDefault(); openUrl(open.dataset.open); return; }
   const star = e.target.closest("[data-star]");
