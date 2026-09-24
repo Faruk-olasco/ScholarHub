@@ -191,10 +191,14 @@ $("#list").addEventListener("click", (e) => {
   const i = state.items.find((x) => x.id === card.dataset.id); if (i) openDetail(i);
 });
 $("#more").onclick = () => load(false);
-function doSearch() { state.q = $("#q").value.trim(); load(); $("#q").blur(); }
-let t; $("#q").oninput = (e) => { clearTimeout(t); t = setTimeout(doSearch, 600); };
-$("#q").onkeydown = (e) => { if (e.key === "Enter") { clearTimeout(t); doSearch(); } };
-if ($("#searchBtn")) $("#searchBtn").onclick = () => { clearTimeout(t); doSearch(); };
+function doSearch(closeKeyboard) {
+  const q = $("#q").value.trim();
+  if (q !== state.q) { state.q = q; load(true); }
+  if (closeKeyboard) $("#q").blur();
+}
+let t; $("#q").oninput = () => { clearTimeout(t); t = setTimeout(() => doSearch(false), 900); };
+$("#q").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); clearTimeout(t); doSearch(true); } };
+if ($("#searchBtn")) $("#searchBtn").onclick = () => { clearTimeout(t); doSearch(true); };
 async function refresh() {
   const b = $("#refreshBtn"); if (b) b.classList.add("spin");
   Object.keys(localStorage).filter((k) => k.startsWith("cache:")).forEach((k) => localStorage.removeItem(k));
