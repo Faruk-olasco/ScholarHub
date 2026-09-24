@@ -10,8 +10,8 @@ window.SUPABASE_ANON_KEY = "sb_publishable_qI60qVcNwEW6DUN4Bdztjw_lJaeuijY";
 //    Replace with your own IDs from https://apps.admob.com before publishing, and set testing:false.
 //    (The AdMob *App ID* goes in setup-android.sh / the ADMOB_APP_ID GitHub secret, not here.)
 window.ADMOB = {
-  bannerId: "ca-app-pub-3940256099942544/6300978111",        // banner ad unit
-  interstitialId: "ca-app-pub-3940256099942544/1033173712",  // interstitial ad unit
+  bannerId: "ca-app-pub-5520099370989885/9429046228",        // banner ad unit
+  interstitialId: "ca-app-pub-5520099370989885/3405643484",  // interstitial ad unit
   testing: true,
   interstitialEvery: 6,   // full-screen ad every N scholarship detail opens (keep ≥5 to stay policy-friendly)
 };
