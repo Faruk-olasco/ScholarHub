@@ -251,7 +251,8 @@ function openDetail(i) {
   $("#detailBody").innerHTML = `<div class="detail">
     <h2>${esc(i.title)}</h2>${deadlineHtml(i.deadline)}${tags(i)}
     <p>${esc(i.summary)}</p>
-    <div class="muted">Source: ${esc(i.source)}</div>
+    <div class="muted">Source: ${esc(i.source)}${i.tier === "official" ? " (provider's own website)" : ""}</div>
+    <div class="muted" style="margin-top:6px;font-size:12px">ℹ️ Independent app – not affiliated with any government, university or provider. Verify all details and apply only on the official page below.</div>
     <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#38bdf8">${esc(i.url)}</a></div>
     <div class="actions">
       <button class="ghost" id="dSave">${saved.has(i.id) ? "★ Saved" : "☆ Save"}</button>
