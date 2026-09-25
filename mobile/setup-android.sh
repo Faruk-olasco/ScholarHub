@@ -42,5 +42,10 @@ VCODE="${VERSION_CODE:-1}"
 VNAME="${VERSION_NAME:-1.0.0}"
 sed -i "s/versionCode [0-9]*/versionCode $VCODE/; s/versionName \"[^\"]*\"/versionName \"$VNAME\"/" "$GRADLE"
 echo "Version: $VNAME ($VCODE)"
+# Google Play requires targetSdk 36 (Android 16) or higher
+VARS=android/variables.gradle
+sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 36/; s/targetSdkVersion = [0-9]*/targetSdkVersion = 36/' "$VARS"
+grep -q suppressUnsupportedCompileSdk android/gradle.properties || echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
+echo "SDK: $(grep -E 'compileSdkVersion|targetSdkVersion' $VARS | tr -s ' ')"
 grep -q 'android.permission.INTERNET' "$MANIFEST" || sed -i 's#<manifest #<manifest xmlns:tools="http://schemas.android.com/tools" #' "$MANIFEST"
 echo "Done. Now: npx cap sync android && cd android && ./gradlew assembleDebug"
