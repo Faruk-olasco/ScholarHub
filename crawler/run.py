@@ -101,6 +101,7 @@ def main():
                 src, res, items, found = f.result()
             except Exception as e:
                 log.warning("worker error: %s", e); continue
+            n=0
             try:
                 n = upsert(items)
                 new_total += n
