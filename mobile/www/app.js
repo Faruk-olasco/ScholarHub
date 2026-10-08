@@ -13,6 +13,8 @@ const AdMob = Cap && Cap.Plugins && Cap.Plugins.AdMob;
 const Browser = Cap && Cap.Plugins && Cap.Plugins.Browser;
 const Share = Cap && Cap.Plugins && Cap.Plugins.Share;
 const CapApp = Cap && Cap.Plugins && Cap.Plugins.App;
+const FCM = Cap && Cap.Plugins && Cap.Plugins.FirebaseMessaging;      // "new scholarships" push (topic-based, no tokens stored by us)
+const LocalNotif = Cap && Cap.Plugins && Cap.Plugins.LocalNotifications; // deadline reminders, scheduled on the phone
 const SHARE_BASE = (window.SHARE_URL || "").replace(/\/$/, "");
 const shareLink = (i) => (SHARE_BASE ? SHARE_BASE + "/?s=" + encodeURIComponent(i.id) : i.url);
 
@@ -44,7 +46,7 @@ async function openById(id) {
 function idFromUrl(u) { try { return new URL(u).searchParams.get("s"); } catch (e) { return null; } }
 
 const $ = (s) => document.querySelector(s);
-const state = { tab: "all", region: "", q: "", level: "", field: "", funding: "", tier: "", country: "", expired: 0, offset: 0, items: [], total: 0, detailOpens: 0 };
+const state = { tab: "all", region: "", newOnly: 0, q: "", level: "", field: "", funding: "", tier: "", country: "", expired: 0, offset: 0, items: [], total: 0, detailOpens: 0 };
 const saved = new Set(JSON.parse(localStorage.getItem("saved") || "[]"));
 const savedItems = JSON.parse(localStorage.getItem("savedItems") || "{}");
 // My Plan: personal to-do list + per-scholarship notes (stored on the phone only)
@@ -55,8 +57,60 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 function addTask(text, due, item) {
   text = (text || "").trim(); if (!text) return;
   plan.unshift({ id: uid(), text, due: due || "", done: false, sid: item ? item.id : "", stitle: item ? item.title : "", created: Date.now() });
-  if (item && !savedItems[item.id]) savedItems[item.id] = item;
+  if (item && !savedItems[item.id]) { savedItems[item.id] = item; scheduleDeadline(item); }
   savePlan();
+}
+
+
+// ---------- Notifications ----------
+const notif = Object.assign({ daily: false, region: "", deadlines: false, asked: false }, JSON.parse(localStorage.getItem("notif") || "{}"));
+const saveNotif = () => localStorage.setItem("notif", JSON.stringify(notif));
+const topicOf = (r) => (r ? "r_" + r.toLowerCase().replace(/[^a-z]+/g, "_") : "all");
+const nid = (str, k) => { let h = 0; for (const c of str) h = (h * 31 + c.charCodeAt(0)) | 0; return (Math.abs(h) % 10000000) * 100 + k; }; // stable int id per scholarship + days-left (0..14)
+async function askPermission() {
+  let ok = true;
+  try { if (LocalNotif) { const r = await LocalNotif.requestPermissions(); ok = r.display === "granted"; } } catch (e) {}
+  try { if (FCM) { const r = await FCM.requestPermissions(); ok = ok && r.receive === "granted"; } } catch (e) {}
+  notif.asked = true; saveNotif(); return ok;
+}
+async function applyDailyPush() {
+  if (!isNative || !FCM) return;
+  try {
+    try { await FCM.createChannel({ id: "scholarhub_daily", name: "New scholarships", description: "A notification after each crawl when new opportunities are added", importance: 3 }); } catch (e) {}
+    const want = notif.daily ? topicOf(notif.region) : null;
+    const topics = ["all"].concat(FILTERS.regions.map(topicOf));
+    for (const t of topics) { if (t !== want) { try { await FCM.unsubscribeFromTopic({ topic: t }); } catch (e) {} } }
+    if (want) await FCM.subscribeToTopic({ topic: want });
+  } catch (e) { console.warn("push", e); }
+}
+async function scheduleDeadline(i) {
+  if (!isNative || !LocalNotif || !notif.deadlines || !i.deadline) return;
+  const dl = new Date(i.deadline + "T09:00:00"); const list = [];
+  for (let d = 14; d >= 0; d--) { // one reminder every morning for the last 14 days, counting down
+    const at = new Date(dl.getTime() - d * 864e5);
+    if (at <= new Date()) continue;
+    const title = d === 0 ? "⏰ Deadline is TODAY" : d === 1 ? "⏰ Deadline is tomorrow" : `⏰ ${d} days left`;
+    list.push({ id: nid(i.id, d), title, body: i.title.slice(0, 90), schedule: { at, allowWhileIdle: true }, extra: { s: i.id }, smallIcon: "ic_stat_push", channelId: "scholarhub_deadlines" });
+  }
+  if (list.length) { try { await LocalNotif.schedule({ notifications: list }); } catch (e) { console.warn("schedule", e); } }
+}
+async function cancelDeadline(id) {
+  if (!isNative || !LocalNotif) return;
+  try { await LocalNotif.cancel({ notifications: Array.from({ length: 15 }, (_, k) => ({ id: nid(id, k) })) }); } catch (e) {}
+}
+async function rescheduleAllDeadlines() {
+  if (!isNative || !LocalNotif) return;
+  try { const p = await LocalNotif.getPending(); if (p.notifications.length) await LocalNotif.cancel(p); } catch (e) {}
+  if (!notif.deadlines) return;
+  try { await LocalNotif.createChannel({ id: "scholarhub_deadlines", name: "Deadline reminders", importance: 4 }); } catch (e) {}
+  const seen = new Set();
+  for (const i of Object.values(savedItems)) { if (!seen.has(i.id)) { seen.add(i.id); await scheduleDeadline(i); } }
+}
+function openNotifSheet() {
+  $("#nDaily").checked = notif.daily; $("#nDeadlines").checked = notif.deadlines; $("#nRegion").value = notif.region;
+  $("#nRegionWrap").style.display = notif.daily ? "" : "none";
+  $("#nHint").textContent = isNative ? "Notifications are free and you can switch them off here any time. We never store your contact details." : "Install the Android app to receive notifications.";
+  $("#alerts").classList.remove("hidden");
 }
 
 // ---------- AdMob ----------
@@ -94,6 +148,7 @@ function buildQuery(offset) {
   p.set("select", "id,title,url,source,summary,published,deadline,countries,regions,levels,fields,funding,tier");
   if (state.q) { const q = state.q.replace(/[%*,()."'\\:&|!<>]/g, " ").replace(/\s+/g, " ").trim(); if (q) p.set("and", `(or(title.wfts(english).${q},summary.wfts(english).${q}))`); }
   if (state.region) p.set("regions", like(state.region));
+  if (state.newOnly) p.set("first_seen", "gte." + new Date(Date.now() - 36 * 3600e3).toISOString());
   if (state.level) p.set("levels", like(state.level));
   if (state.field) p.set("fields", like(state.field));
   if (state.funding) p.set("funding", like(state.funding));
@@ -139,6 +194,7 @@ function setOffline(on) {
   if (on && !b) { b = document.createElement("div"); b.className = "offline"; b.textContent = "Offline – showing saved results"; $("#top").after(b); }
   if (!on && b) b.remove();
 }
+
 
 // ---------- Daily boost (motivation for applicants; rotates daily, tap ↻ for another) ----------
 const BOOSTS = [
@@ -224,7 +280,7 @@ function render() {
       <div class="meta">via ${esc(i.source)} · ${esc((i.published || "").slice(0, 10))}</div>
     </div>`).join("");
   $("#more").classList.toggle("hidden", state.tab === "saved" || state.offset >= state.total);
-  $("#stats").textContent = `${state.total.toLocaleString()} opportunities${state.region ? " · " + state.region : ""}`;
+  $("#stats").textContent = `${state.total.toLocaleString()} ${state.newOnly ? "new " : ""}opportunities${state.region ? " · " + state.region : ""}${state.newOnly ? " · tap ↻ for all" : ""}`;
   api("/app_stats?select=last_run").then((r) => { const t = r.items[0] && r.items[0].last_run; if (t) $("#stats").textContent += ` · updated ${new Date(t).toLocaleString([], { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`; }).catch(() => {});
 }
 function renderPlan() {
@@ -275,6 +331,7 @@ function toggleSave(i) {
   if (saved.has(i.id)) { saved.delete(i.id); delete savedItems[i.id]; } else { saved.add(i.id); savedItems[i.id] = i; }
   localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems));
   document.querySelectorAll(`[data-star="${i.id}"]`).forEach((b) => b.classList.toggle("on", saved.has(i.id)));
+  if (saved.has(i.id)) scheduleDeadline(i); else cancelDeadline(i.id);
 }
 
 // ---------- events ----------
@@ -303,6 +360,7 @@ let t; $("#q").oninput = () => { clearTimeout(t); t = setTimeout(() => doSearch(
 $("#q").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); clearTimeout(t); doSearch(true); } };
 if ($("#searchBtn")) $("#searchBtn").onclick = () => { clearTimeout(t); doSearch(true); };
 async function refresh() {
+  state.newOnly = 0;
   const b = $("#refreshBtn"); if (b) b.classList.add("spin");
   Object.keys(localStorage).filter((k) => k.startsWith("cache:")).forEach((k) => localStorage.removeItem(k));
   await load(); if (b) b.classList.remove("spin"); window.scrollTo(0, 0);
@@ -317,24 +375,27 @@ document.querySelectorAll(".tabs [data-tab]").forEach((b) => (b.onclick = () => 
 $("#filtersBtn").onclick = () => $("#sheet").classList.remove("hidden");
 $("#apply").onclick = () => { state.level = $("#fLevel").value; state.field = $("#fField").value; state.funding = $("#fFunding").value; state.tier = $("#fTier").value; state.country = $("#fCountry").value.trim(); state.expired = $("#fExpired").checked ? 1 : 0; $("#sheet").classList.add("hidden"); load(); };
 $("#clear").onclick = () => { ["fLevel", "fField", "fFunding", "fTier"].forEach((id) => ($("#" + id).value = "")); $("#fCountry").value = ""; $("#fExpired").checked = false; };
-$("#alertsBtn").onclick = () => $("#alerts").classList.remove("hidden");
+$("#alertsBtn").onclick = openNotifSheet;
 $("#aCancel").onclick = () => $("#alerts").classList.add("hidden");
+$("#nDaily").onchange = () => { $("#nRegionWrap").style.display = $("#nDaily").checked ? "" : "none"; };
 $("#aSave").onclick = async () => {
-  const fd = new URLSearchParams({ channel: $("#aChannel").value, address: $("#aAddress").value.trim(), keywords: $("#aKeywords").value.trim(), level: "", country: $("#aCountry").value.trim() });
-  if (!fd.get("address")) return alert("Enter an email or Telegram chat ID");
-  try {
-    const r = await fetch(SB_URL + "/subscribers", { method: "POST", headers: { ...SB_HEADERS, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates" }, body: JSON.stringify(Object.fromEntries(fd)) });
-    if (!r.ok) throw new Error(r.status);
-    alert("Subscribed! You'll be alerted about new matching scholarships."); $("#alerts").classList.add("hidden");
-  } catch (e) { alert("Could not subscribe – check your connection."); }
+  notif.daily = $("#nDaily").checked; notif.region = $("#nRegion").value; notif.deadlines = $("#nDeadlines").checked; saveNotif();
+  if ((notif.daily || notif.deadlines) && isNative) {
+    const ok = await askPermission();
+    if (!ok) { alert("Notifications are blocked for ScholarHub. Allow them in your phone's Settings → Apps → ScholarHub → Notifications."); }
+  }
+  await applyDailyPush(); await rescheduleAllDeadlines();
+  $("#alerts").classList.add("hidden");
+  const on = [notif.daily && "new-scholarship updates" + (notif.region ? " for " + notif.region : ""), notif.deadlines && "deadline reminders"].filter(Boolean);
+  if (on.length) alert("✅ You'll get " + on.join(" and ") + ".");
 };
 document.querySelectorAll(".sheet").forEach((s) => s.addEventListener("click", (e) => { if (e.target === s) s.classList.add("hidden"); }));
 
 // ---------- admin (tap logo 7×, then PIN) ----------
-let logoTaps = 0, logoTimer;
+let logoTaps = 0, logoTimer, adminPin = ""; // PIN is verified by the database policy, never stored in the app
 document.querySelector(".brand").addEventListener("click", () => {
   logoTaps++; clearTimeout(logoTimer); logoTimer = setTimeout(() => (logoTaps = 0), 2500);
-  if (logoTaps >= 7) { logoTaps = 0; const pin = prompt("Admin PIN"); if (pin === window.ADMIN_PIN) openAdmin(); }
+  if (logoTaps >= 7) { logoTaps = 0; const pin = prompt("Admin PIN"); if (pin && (!window.ADMIN_PIN || pin === window.ADMIN_PIN)) { adminPin = pin; openAdmin(); } }
 });
 async function openAdmin() {
   $("#admin").classList.remove("hidden"); refreshAdmin();
@@ -352,7 +413,8 @@ $("#pQueue").onclick = async () => {
   const url = $("#pUrl").value.trim();
   if (!/^https?:\/\//.test(url)) return alert("Enter a full link starting with https://");
   try {
-    const r = await fetch(SB_URL + "/pull_requests", { method: "POST", headers: { ...SB_HEADERS, "Content-Type": "application/json" }, body: JSON.stringify({ url, save_as_source: $("#pSave").checked, deep: $("#pDeep").checked }) });
+    const r = await fetch(SB_URL + "/pull_requests", { method: "POST", headers: { ...SB_HEADERS, "Content-Type": "application/json" }, body: JSON.stringify({ url, save_as_source: $("#pSave").checked, deep: $("#pDeep").checked, ...(window.ADMIN_PIN ? {} : { pin: adminPin }) }) });
+    if (r.status === 401 || r.status === 403) { alert("Wrong admin PIN."); $("#admin").classList.add("hidden"); return; }
     if (!r.ok) throw new Error(r.status);
     $("#pUrl").value = ""; alert("Queued. It will be pulled on the next crawl — or run “Pull from a link” on GitHub now."); refreshAdmin();
   } catch (e) { alert("Could not queue: " + e.message); }
@@ -365,6 +427,7 @@ async function init() {
     const f = FILTERS;
     const fill = (id, arr) => (document.getElementById(id).innerHTML += arr.map((v) => `<option>${esc(v)}</option>`).join(""));
     fill("fLevel", f.levels); fill("fField", f.fields); fill("fFunding", f.funding);
+    $("#nRegion").innerHTML += f.regions.map((r) => `<option>${esc(r)}</option>`).join("");
     $("#regionChips").innerHTML = ['<button class="chip on" data-region="">🌍 All</button>'].concat(f.regions.map((r) => `<button class="chip" data-region="${esc(r)}">${esc(r)}</button>`)).join("");
     document.querySelectorAll(".chip").forEach((c) => (c.onclick = () => { document.querySelectorAll(".chip").forEach((x) => x.classList.remove("on")); c.classList.add("on"); state.region = c.dataset.region; load(); }));
   } catch (e) {}
@@ -376,6 +439,22 @@ async function init() {
     CapApp.addListener("appUrlOpen", (ev) => { const id = idFromUrl(ev.url); if (id) openById(id); });
     try { CapApp.getLaunchUrl().then((r) => { const id = r && r.url && idFromUrl(r.url); if (id) openById(id); }).catch(() => {}); } catch (e) {}
   }
+  // notifications: react to taps, keep subscriptions in sync, offer once on the 2nd open
+  function openFromNotif(data) {
+    data = data || {};
+    if (data.s) return openById(data.s);
+    if (data.newOnly) { state.newOnly = 1; state.tab = "all"; state.q = ""; $("#q").value = ""; state.region = data.region || "";
+      document.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", (c.dataset.region || "") === state.region));
+      document.querySelectorAll(".tabs [data-tab]").forEach((x) => x.classList.toggle("on", x.dataset.tab === "all")); load(); window.scrollTo(0, 0); }
+  }
+  if (FCM && FCM.addListener) {
+    FCM.addListener("notificationActionPerformed", (ev) => openFromNotif(ev.notification && ev.notification.data));
+    FCM.addListener("notificationReceived", (ev) => { const n = ev.notification || {}; if (n.title) { hideBoostToast(); const t = document.createElement("div"); t.className = "toast in"; t.id = "toast"; t.innerHTML = `<div class="toast-tag">🔔 ${esc(n.title)}</div><div class="toast-q">${esc(n.body || "")}</div><button class="toast-x">✕</button>`; document.body.appendChild(t); t.querySelector(".toast-x").onclick = hideBoostToast; t.onclick = () => { hideBoostToast(); openFromNotif(n.data); }; toastTimer = setTimeout(hideBoostToast, 10000); } });
+    applyDailyPush();
+  }
+  if (LocalNotif && LocalNotif.addListener) LocalNotif.addListener("localNotificationActionPerformed", (ev) => openFromNotif(ev.notification && ev.notification.extra));
+  const opens = (+localStorage.getItem("opens") || 0) + 1; localStorage.setItem("opens", opens);
+  if (isNative && !notif.asked && opens === 2) setTimeout(() => { if (confirm("Want to be notified when new scholarships are added, and get daily countdown reminders before the deadlines of the ones you save?")) { notif.daily = true; notif.deadlines = true; saveNotif(); askPermission().then(() => { applyDailyPush(); rescheduleAllDeadlines(); }); } else { notif.asked = true; saveNotif(); } }, 4000);
   // motivation pop-ups: shortly after open, then every 5 minutes of use
   setTimeout(showBoostToast, 3000);
   setInterval(showBoostToast, 5 * 60 * 1000);
