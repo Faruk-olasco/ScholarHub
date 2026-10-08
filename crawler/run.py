@@ -62,7 +62,8 @@ def upsert(items):
     for i in range(0, len(ids), 300):
         existing |= {r["id"] for r in SB.table("scholarships").select("id").in_("id", ids[i:i + 300]).execute().data}
     new = [i for i in items if i["id"] not in existing]
-    old = [{"id": i["id"], "deadline": i["deadline"], "last_seen": datetime.now(timezone.utc).isoformat()} for i in items if i["id"] in existing and i["deadline"]]
+    now = datetime.now(timezone.utc).isoformat()
+    old = [{"id": i["id"], "last_seen": now, **({"deadline": i["deadline"]} if i["deadline"] else {})} for i in items if i["id"] in existing]
     for i in range(0, len(new), 200):
         SB.table("scholarships").upsert(new[i:i + 200], on_conflict="id").execute()
     for i in range(0, len(old), 200):
@@ -101,7 +102,7 @@ def main():
                 src, res, items, found = f.result()
             except Exception as e:
                 log.warning("worker error: %s", e); continue
-            n=0
+            n = 0
             try:
                 n = upsert(items)
                 new_total += n
@@ -129,7 +130,12 @@ def main():
     log.info("DONE: %d new, %d total, %d new sources discovered, %d source errors, %.0fs",
              new_total, total, discovered, len(errors), (datetime.now(timezone.utc) - started).total_seconds())
 
-    # optional alerts
+    # push notification to app users (Firebase topics) + optional email/telegram alerts
+    try:
+        from push import send_daily
+        send_daily(SB)
+    except Exception as e:
+        log.warning("push failed: %s", e)
     if all_new and (os.environ.get("SMTP_HOST") or os.environ.get("TELEGRAM_BOT_TOKEN")):
         try:
             from crawler.alerts import dispatch
