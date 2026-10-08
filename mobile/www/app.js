@@ -63,7 +63,7 @@ function addTask(text, due, item) {
 
 
 // ---------- Notifications ----------
-const notif = Object.assign({ daily: false, region: "", deadlines: false, asked: false }, JSON.parse(localStorage.getItem("notif") || "{}"));
+const notif = Object.assign({ daily: true, region: "", deadlines: true, asked: false }, JSON.parse(localStorage.getItem("notif") || "{}"));
 const saveNotif = () => localStorage.setItem("notif", JSON.stringify(notif));
 const topicOf = (r) => (r ? "r_" + r.toLowerCase().replace(/[^a-z]+/g, "_") : "all");
 const nid = (str, k) => { let h = 0; for (const c of str) h = (h * 31 + c.charCodeAt(0)) | 0; return (Math.abs(h) % 10000000) * 100 + k; }; // stable int id per scholarship + days-left (0..14)
@@ -439,7 +439,7 @@ async function init() {
     CapApp.addListener("appUrlOpen", (ev) => { const id = idFromUrl(ev.url); if (id) openById(id); });
     try { CapApp.getLaunchUrl().then((r) => { const id = r && r.url && idFromUrl(r.url); if (id) openById(id); }).catch(() => {}); } catch (e) {}
   }
-  // notifications: react to taps, keep subscriptions in sync, offer once on the 2nd open
+  // notifications: react to taps, keep subscriptions in sync
   function openFromNotif(data) {
     data = data || {};
     if (data.s) return openById(data.s);
@@ -453,8 +453,8 @@ async function init() {
     applyDailyPush();
   }
   if (LocalNotif && LocalNotif.addListener) LocalNotif.addListener("localNotificationActionPerformed", (ev) => openFromNotif(ev.notification && ev.notification.extra));
-  const opens = (+localStorage.getItem("opens") || 0) + 1; localStorage.setItem("opens", opens);
-  if (isNative && !notif.asked && opens === 2) setTimeout(() => { if (confirm("Want to be notified when new scholarships are added, and get daily countdown reminders before the deadlines of the ones you save?")) { notif.daily = true; notif.deadlines = true; saveNotif(); askPermission().then(() => { applyDailyPush(); rescheduleAllDeadlines(); }); } else { notif.asked = true; saveNotif(); } }, 4000);
+  // notifications are ON by default: ask Android's permission once, shortly after the first open
+  if (isNative && !notif.asked) setTimeout(() => { askPermission().then(() => { applyDailyPush(); rescheduleAllDeadlines(); }); }, 3000);
   // motivation pop-ups: shortly after open, then every 5 minutes of use
   setTimeout(showBoostToast, 3000);
   setInterval(showBoostToast, 5 * 60 * 1000);
