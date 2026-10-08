@@ -290,9 +290,9 @@ function renderPlan() {
   const dueTxt = (d) => { if (!d) return ""; const days = Math.round((new Date(d) - new Date().setHours(0, 0, 0, 0)) / 864e5); return `<span class="${days < 0 ? "dl past" : days <= 3 ? "dl soon" : ""}">📅 ${d}${days < 0 ? " (overdue)" : days === 0 ? " (today)" : days > 0 && days <= 14 ? ` (${days}d)` : ""}</span>`; };
   const row = (t) => `<div class="task ${t.done ? "done" : ""}" data-task="${t.id}">
       <input type="checkbox" data-done="${t.id}" ${t.done ? "checked" : ""}>
-      <div class="body"><div class="txt">${esc(t.text)}</div>
+      <div class="body"><div class="txt" data-edit="${t.id}" title="Tap to edit">${esc(t.text)}</div>
         <div class="sub">${dueTxt(t.due)}${t.sid ? `${t.due ? " · " : ""}🎓 <a href="#" data-goto="${esc(t.sid)}">${esc(t.stitle).slice(0, 60)}</a>` : ""}</div></div>
-      <button class="del" data-del="${t.id}" aria-label="Delete">✕</button></div>`;
+      <button class="del" data-edit="${t.id}" aria-label="Edit">✎</button><button class="del" data-del="${t.id}" aria-label="Delete">✕</button></div>`;
   list.innerHTML = boostHtml() + `<div class="plan-add">
       <textarea id="tText" placeholder="What are you working on? e.g. Request transcript for DAAD application, write motivation letter…"></textarea>
       <div class="row"><input type="date" id="tDue" aria-label="Due date"><button id="tAdd">＋ Add</button></div></div>
@@ -339,6 +339,11 @@ $("#list").addEventListener("click", (e) => {
   if (e.target.closest("[data-boost]")) { nextBoost(); return; }
   const dn = e.target.closest("[data-done]");
   if (dn) { const t = plan.find((x) => x.id === dn.dataset.done); if (t) { t.done = dn.checked; savePlan(); setTimeout(renderPlan, 250); } return; }
+  const ed = e.target.closest("[data-edit]");
+  if (ed) { const t = plan.find((x) => x.id === ed.dataset.edit); if (!t) return;
+    const text = prompt("Edit task", t.text); if (text === null) return;
+    const due = prompt("Due date (YYYY-MM-DD, leave empty for none)", t.due || ""); if (due === null) return;
+    if (text.trim()) t.text = text.trim(); t.due = /^\d{4}-\d{2}-\d{2}$/.test(due.trim()) ? due.trim() : ""; savePlan(); renderPlan(); return; }
   const del = e.target.closest("[data-del]");
   if (del) { const k = plan.findIndex((x) => x.id === del.dataset.del); if (k > -1 && confirm("Delete this task?")) { plan.splice(k, 1); savePlan(); renderPlan(); } return; }
   const go = e.target.closest("[data-goto]");
