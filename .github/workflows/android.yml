@@ -10,6 +10,7 @@ jobs:
     defaults: { run: { working-directory: mobile } }
     env:
       HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' }}
+      HAS_FIREBASE: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,8 +22,10 @@ jobs:
           packages: 'platform-tools'
       - run: npm install
       - run: npx cap add android
-      #- run: chmod +x setup-android.sh && ADMOB_APP_ID="${{ secrets.ADMOB_APP_ID }}" ./setup-android.sh
-      #- run: chmod +x setup-android.sh && ADMOB_APP_ID="${{ secrets.ADMOB_APP_ID }}" SHARE_HOST="${{ secrets.SHARE_HOST }}" ./setup-android.sh
+      - name: Firebase config (push notifications)
+        if: ${{ env.HAS_FIREBASE == 'true' }}
+        env: { GSJ: "${{ secrets.GOOGLE_SERVICES_JSON }}" }
+        run: printf '%s' "$GSJ" > android/app/google-services.json && echo "google-services.json written"
       - run: chmod +x setup-android.sh && ADMOB_APP_ID="${{ secrets.ADMOB_APP_ID }}" SHARE_HOST="${{ secrets.SHARE_HOST }}" VERSION_CODE="${{ github.run_number }}" VERSION_NAME="$(node -p "require('./package.json').version")" ./setup-android.sh
       - run: npx cap sync android
       - name: Build debug APK (installable for testing)
