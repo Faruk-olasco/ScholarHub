@@ -283,24 +283,51 @@ function render() {
   $("#stats").textContent = `${state.total.toLocaleString()} ${state.newOnly ? "new " : ""}opportunities${state.region ? " · " + state.region : ""}${state.newOnly ? " · tap ↻ for all" : ""}`;
   api("/app_stats?select=last_run").then((r) => { const t = r.items[0] && r.items[0].last_run; if (t) $("#stats").textContent += ` · updated ${new Date(t).toLocaleString([], { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`; }).catch(() => {});
 }
+let planView = localStorage.getItem("planView") || "todo", editingNote = null;
 function renderPlan() {
   const list = $("#list"); $("#more").classList.add("hidden");
   const open = plan.filter((t) => !t.done), done = plan.filter((t) => t.done);
-  $("#stats").textContent = `${open.length} to do · ${done.length} done`;
+  const noteIds = Object.keys(notes).filter((k) => notes[k]);
+  $("#stats").textContent = planView === "notes" ? `${noteIds.length} note${noteIds.length === 1 ? "" : "s"}` : `${open.length} to do · ${done.length} done`;
+  const seg = `<div class="row" style="gap:8px;margin:4px 0 10px">
+      <button class="${planView === "todo" ? "" : "ghost"}" data-pview="todo" style="flex:1">📋 Daily plan (To do)</button>
+      <button class="${planView === "notes" ? "" : "ghost"}" data-pview="notes" style="flex:1">📝 Opportunity notes</button></div>`;
   const dueTxt = (d) => { if (!d) return ""; const days = Math.round((new Date(d) - new Date().setHours(0, 0, 0, 0)) / 864e5); return `<span class="${days < 0 ? "dl past" : days <= 3 ? "dl soon" : ""}">📅 ${d}${days < 0 ? " (overdue)" : days === 0 ? " (today)" : days > 0 && days <= 14 ? ` (${days}d)` : ""}</span>`; };
   const row = (t) => `<div class="task ${t.done ? "done" : ""}" data-task="${t.id}">
       <input type="checkbox" data-done="${t.id}" ${t.done ? "checked" : ""}>
       <div class="body"><div class="txt" data-edit="${t.id}" title="Tap to edit">${esc(t.text)}</div>
         <div class="sub">${dueTxt(t.due)}${t.sid ? `${t.due ? " · " : ""}🎓 <a href="#" data-goto="${esc(t.sid)}">${esc(t.stitle).slice(0, 60)}</a>` : ""}</div></div>
       <button class="del" data-edit="${t.id}" aria-label="Edit">✎</button><button class="del" data-del="${t.id}" aria-label="Delete">✕</button></div>`;
-  list.innerHTML = boostHtml() + `<div class="plan-add">
+  const noteRow = (sid) => { const it = savedItems[sid] || {}; const title = it.title || "Scholarship"; const editing = editingNote === sid; return `<div class="card" data-notecard="${esc(sid)}" style="margin-bottom:10px">
+      <h3 style="padding-right:0"><a href="#" data-goto="${esc(sid)}">${esc(title)}</a></h3>
+      ${deadlineHtml(it.deadline)}
+      ${editing
+        ? `<textarea data-note="${esc(sid)}" aria-label="Note" style="width:100%;min-height:90px;margin-top:10px;padding:10px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:inherit;font-size:14px;line-height:1.45;font-family:inherit;resize:vertical;box-sizing:border-box">${esc(notes[sid])}</textarea>
+           <div class="row" style="justify-content:flex-end;gap:8px;margin-top:8px"><button class="ghost" data-ncancel="${esc(sid)}">Cancel</button><button data-nsave="${esc(sid)}">Save</button></div>`
+        : `<div style="margin-top:10px;padding:10px 12px;border-left:3px solid var(--acc);background:#0f172a;border-radius:8px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(notes[sid])}</div>
+           <div class="row" style="justify-content:flex-end;gap:14px;margin-top:10px;font-size:13px">
+             <a href="#" data-nedit="${esc(sid)}" style="color:#38bdf8;text-decoration:none">✎ Edit</a>
+             <a href="#" data-goto="${esc(sid)}" style="color:#38bdf8;text-decoration:none">Open ↗</a>
+             <a href="#" data-ndel="${esc(sid)}" style="color:var(--bad);text-decoration:none">✕ Delete</a></div>`}
+    </div>`; };
+  if (planView === "notes") {
+    list.innerHTML = boostHtml() + seg + (noteIds.length ? noteIds.map(noteRow).join("") : '<div class="empty">No notes yet. Open any scholarship and tap "Add to opportunity note" – it will appear here.</div>');
+  } else {
+    list.innerHTML = boostHtml() + seg + `<div class="plan-add">
       <textarea id="tText" placeholder="What are you working on? e.g. Request transcript for DAAD application, write motivation letter…"></textarea>
       <div class="row"><input type="date" id="tDue" aria-label="Due date"><button id="tAdd">＋ Add</button></div></div>
     ${plan.length ? "" : '<div class="empty">Your plan is empty. Add tasks here, or open any scholarship and tap "Add to plan".</div>'}
     ${open.length ? '<div class="plan-h">To do</div>' + open.map(row).join("") : ""}
     ${done.length ? '<div class="plan-h">Done</div>' + done.map(row).join("") : ""}`;
-  $("#tAdd").onclick = () => { addTask($("#tText").value, $("#tDue").value); renderPlan(); };
-  $("#tText").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#tAdd").click(); } };
+    $("#tAdd").onclick = () => { addTask($("#tText").value, $("#tDue").value); renderPlan(); };
+    $("#tText").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#tAdd").click(); } };
+  }
+  list.querySelectorAll("[data-pview]").forEach((b) => (b.onclick = () => { planView = b.dataset.pview; localStorage.setItem("planView", planView); renderPlan(); }));
+  // notes: view → edit (Save/Cancel), delete, or jump to the scholarship
+  list.querySelectorAll("[data-nedit]").forEach((el) => (el.onclick = (e) => { e.preventDefault(); editingNote = el.dataset.nedit; renderPlan(); const ta = list.querySelector("textarea[data-note]"); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }));
+  list.querySelectorAll("[data-ncancel]").forEach((el) => (el.onclick = () => { editingNote = null; renderPlan(); }));
+  list.querySelectorAll("[data-nsave]").forEach((el) => (el.onclick = () => { const ta = list.querySelector(`textarea[data-note="${el.dataset.nsave}"]`); const v = ta ? ta.value.trim() : ""; if (v) notes[el.dataset.nsave] = v; else delete notes[el.dataset.nsave]; savePlan(); editingNote = null; renderPlan(); }));
+  list.querySelectorAll("[data-ndel]").forEach((el) => (el.onclick = (e) => { e.preventDefault(); if (!confirm("Delete this note?")) return; delete notes[el.dataset.ndel]; savePlan(); editingNote = null; renderPlan(); }));
 }
 function openDetail(i) {
   maybeInterstitial();
@@ -315,18 +342,33 @@ function openDetail(i) {
       <button class="ghost" id="dShare">Share</button>
       <button id="dOpen">Apply / Details ↗</button>
     </div>
-    <div class="muted" style="margin-top:16px">📝 My notes for this scholarship</div>
-    <textarea class="note" id="dNote" placeholder="e.g. Need 2 reference letters, IELTS 6.5, submit before 15 March…">${esc(notes[i.id] || "")}</textarea>
-    <div class="row" style="justify-content:space-between;margin-top:6px"><span class="muted" id="dNoteSaved">${planCount(i.id)}</span><button class="ghost" id="dPlan">＋ Add to plan</button></div></div>`;
+    <div id="dNoteWrap"></div></div>`;
   $("#detail").classList.remove("hidden");
   $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
   $("#dOpen").onclick = () => openUrl(i.url);
   $("#dShare").onclick = () => shareItem(i);
   $("#dSave").onclick = () => { toggleSave(i); $("#dSave").textContent = saved.has(i.id) ? "★ Saved" : "☆ Save"; };
-  let nt; $("#dNote").oninput = (e) => { clearTimeout(nt); nt = setTimeout(() => { const v = e.target.value.trim(); if (v) notes[i.id] = v; else delete notes[i.id]; if (v && !savedItems[i.id]) { savedItems[i.id] = i; saved.add(i.id); localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems)); } savePlan(); $("#dNoteSaved").textContent = "Saved ✓"; }, 500); };
-  $("#dPlan").onclick = () => { const text = prompt("Task for “" + i.title.slice(0, 40) + "…”", "Apply: " + i.title.slice(0, 60)); if (text === null) return; addTask(text, i.deadline || "", i); $("#dNoteSaved").textContent = planCount(i.id) + " · added ✓"; };
+  const renderNoteBox = (editing) => {
+    const cur = notes[i.id] || "";
+    $("#dNoteWrap").innerHTML = editing
+      ? `<div class="muted" style="margin-top:16px">📝 Opportunity note</div>
+         <textarea class="note" id="dNote" placeholder="e.g. Need 2 reference letters, IELTS 6.5, submit before 15 March…">${esc(cur)}</textarea>
+         <div class="row" style="justify-content:flex-end;gap:8px;margin-top:8px"><button class="ghost" id="dNoteCancel">Cancel</button><button id="dNoteSave">Save note</button></div>`
+      : `${cur ? `<div class="muted" style="margin-top:16px">📝 Opportunity note</div><div style="margin-top:6px;padding:10px 12px;border-left:3px solid var(--acc);background:#0f172a;border-radius:8px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(cur)}</div>` : ""}
+         <div class="row" style="gap:8px;margin-top:14px"><button class="ghost" id="dPlan" style="flex:1">＋ Add to plan</button><button class="ghost" id="dNoteBtn" style="flex:1">${cur ? "✎ Edit opportunity note" : "📝 Add to opportunity note"}</button></div>
+         <div class="muted" id="dNoteSaved" style="margin-top:6px;font-size:12px">${planCount(i.id)}</div>`;
+    if (editing) {
+      $("#dNote").focus();
+      $("#dNoteCancel").onclick = () => renderNoteBox(false);
+      $("#dNoteSave").onclick = () => { const v = $("#dNote").value.trim(); if (v) { notes[i.id] = v; if (!savedItems[i.id]) { savedItems[i.id] = i; saved.add(i.id); localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems)); $("#dSave").textContent = "★ Saved"; } } else delete notes[i.id]; savePlan(); renderNoteBox(false); $("#dNoteSaved").textContent = v ? "Note saved ✓ — see Plan → Opportunity notes" : planCount(i.id); };
+    } else {
+      $("#dNoteBtn").onclick = () => renderNoteBox(true);
+      $("#dPlan").onclick = () => { const text = prompt("Task for “" + i.title.slice(0, 40) + "…”", "Apply: " + i.title.slice(0, 60)); if (text === null) return; addTask(text, i.deadline || "", i); $("#dNoteSaved").textContent = planCount(i.id) + " · added to Daily plan ✓"; };
+    }
+  };
+  renderNoteBox(false);
 }
-function planCount(sid) { const n = plan.filter((t) => t.sid === sid && !t.done).length; return n ? `${n} open task${n > 1 ? "s" : ""} in plan` : "Notes save automatically"; }
+function planCount(sid) { const n = plan.filter((t) => t.sid === sid && !t.done).length; return n ? `${n} open task${n > 1 ? "s" : ""} in plan` : ""; }
 function toggleSave(i) {
   if (saved.has(i.id)) { saved.delete(i.id); delete savedItems[i.id]; } else { saved.add(i.id); savedItems[i.id] = i; }
   localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems));
