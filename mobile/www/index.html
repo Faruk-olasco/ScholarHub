@@ -65,16 +65,16 @@
   </div>
 </div>
 
-<!-- Alerts sheet -->
+<!-- Notifications sheet -->
 <div id="alerts" class="sheet hidden">
   <div class="sheet-body">
-    <h3>🔔 Get alerts</h3>
-    <p class="muted">We'll email or Telegram you when a matching scholarship appears.</p>
-    <label>Channel <select id="aChannel"><option value="email">Email</option><option value="telegram">Telegram chat ID</option></select></label>
-    <label>Address <input id="aAddress" placeholder="you@example.com"></label>
-    <label>Keywords <input id="aKeywords" placeholder="e.g. engineering, PhD"></label>
-    <label>Country <input id="aCountry" placeholder="optional"></label>
-    <div class="row gap"><button id="aCancel" class="ghost">Cancel</button><button id="aSave">Subscribe</button></div>
+    <h3>🔔 Notifications</h3>
+    <p class="muted" id="nStatus">Choose what you'd like to be reminded about.</p>
+    <label class="row"><input type="checkbox" id="nDaily"> <span><b>New scholarships</b> – get notified whenever new opportunities are added (we check twice a day)</span></label>
+    <label id="nRegionWrap">For which region? <select id="nRegion"><option value="">🌍 Worldwide (all)</option></select></label>
+    <label class="row"><input type="checkbox" id="nDeadlines"> <span><b>Deadline reminders</b> – a daily countdown for the last 14 days before the deadline of anything you've saved or added to your Plan</span></label>
+    <p class="muted" id="nHint" style="font-size:12px"></p>
+    <div class="row gap"><button id="aCancel" class="ghost">Close</button><button id="aSave">Save</button></div>
   </div>
 </div>
 
