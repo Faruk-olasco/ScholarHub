@@ -134,10 +134,15 @@ async function initAds() {
     await AdMob.prepareInterstitial({ adId: window.ADMOB.interstitialId, isTesting: window.ADMOB.testing });
   } catch (e) { console.warn("AdMob init failed", e); }
 }
+// Interstitial: on the first scholarship opened in this session, then at most one every M minutes
+// (never on app launch itself – AdMob policy forbids interstitials on load)
+let lastInterstitialAt = 0;
 async function maybeInterstitial() {
   state.detailOpens++;
-  if (!isNative || !AdMob || state.detailOpens % window.ADMOB.interstitialEvery !== 0) return;
-  try { await AdMob.showInterstitial(); await AdMob.prepareInterstitial({ adId: window.ADMOB.interstitialId, isTesting: window.ADMOB.testing }); } catch (e) {}
+  if (!isNative || !AdMob) return;
+  const gapMs = (window.ADMOB.interstitialMinGapMin || 10) * 60000;
+  if (lastInterstitialAt && Date.now() - lastInterstitialAt < gapMs) return;
+  try { await AdMob.showInterstitial(); lastInterstitialAt = Date.now(); await AdMob.prepareInterstitial({ adId: window.ADMOB.interstitialId, isTesting: window.ADMOB.testing }); } catch (e) {}
 }
 
 // ---------- data (Supabase PostgREST, read-only with the anon key) ----------
