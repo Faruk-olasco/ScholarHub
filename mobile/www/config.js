@@ -13,7 +13,7 @@ window.ADMOB = {
   bannerId: "ca-app-pub-5520099370989885/9429046228",        // banner ad unit
   interstitialId: "ca-app-pub-5520099370989885/3405643484",  // interstitial ad unit
   testing: false,
-  interstitialEvery: 6,   // full-screen ad every N scholarship detail opens (keep ≥5 to stay policy-friendly)
+  interstitialMinGapMin: 10,  // full-screen ad on the first scholarship opened each session, then at most one every 10 minutes
 };
 
 // 3) Links shown in the app
