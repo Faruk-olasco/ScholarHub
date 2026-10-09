@@ -6,13 +6,14 @@
 window.SUPABASE_URL = "https://bmoicxrcyxbssgkfzahu.supabase.co";
 window.SUPABASE_ANON_KEY = "sb_publishable_qI60qVcNwEW6DUN4Bdztjw_lJaeuijY";
 
-// 2) ADMOB. These are Google's official TEST IDs – safe during development (they show "Test Ad" banners).
-//    Replace with your own IDs from https://apps.admob.com before publishing, and set testing:false.
+// 2) ADMOB. Your real ad unit IDs from https://apps.admob.com
 //    (The AdMob *App ID* goes in setup-android.sh / the ADMOB_APP_ID GitHub secret, not here.)
 window.ADMOB = {
   bannerId: "ca-app-pub-5520099370989885/9429046228",        // banner ad unit
   interstitialId: "ca-app-pub-5520099370989885/3405643484",  // interstitial ad unit
   testing: false,
+  nativeId: "ca-app-pub-5520099370989885/2573475753",        // native (in-feed) ad unit; empty = off
+  appOpenId: "ca-app-pub-5520099370989885/7829582579",       // app open ad unit (on return to foreground); empty = off
   interstitialMinGapMin: 10,  // full-screen ad on the first scholarship opened each session, then at most one every 10 minutes
 };
 
