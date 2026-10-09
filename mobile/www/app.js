@@ -133,6 +133,42 @@ async function initAds() {
     await AdMob.showBanner({ adId: window.ADMOB.bannerId, adSize: "ADAPTIVE_BANNER", position: "BOTTOM_CENTER", margin: 0, isTesting: window.ADMOB.testing });
     await AdMob.prepareInterstitial({ adId: window.ADMOB.interstitialId, isTesting: window.ADMOB.testing });
   } catch (e) { console.warn("AdMob init failed", e); }
+  initNativeAds(); initAppOpen();
+}
+// ---- Native (in-feed) ads: real ad cards between scholarship cards, rendered by the Google SDK ----
+let nativeFeed = null;
+const AdMobJS = window.capacitorStripe || window.capacitorAdMob; // JS helpers bundled from the plugin (vendor/admob.js)
+async function initNativeAds() {
+  if (!isNative || !AdMobJS || !AdMobJS.NativeAdFeed || !(window.ADMOB.nativeId || window.ADMOB.testing)) return;
+  try {
+    nativeFeed = await AdMobJS.NativeAdFeed.create({
+      feedId: "list", adId: window.ADMOB.nativeId, isTesting: window.ADMOB.testing, template: AdMobJS.NativeAdTemplate.Small,
+      style: { backgroundColor: "#1e293b", cornerRadius: 14, headlineColor: "#f1f5f9", bodyColor: "#94a3b8", callToActionBackgroundColor: "#38bdf8", callToActionTextColor: "#0f172a" },
+    });
+    // if an ad can't be filled, collapse its slot so there is no empty box in the list
+    try { nativeFeed.addListener(AdMobJS.NativeAdPluginEvents.FailedToLoad, (ev) => { const el = document.querySelector(`capacitor-admob-native[slot-key="${ev.slotKey}"]`); if (el && el.parentElement) el.parentElement.style.display = "none"; }); } catch (e) {}
+    // native ads float above the page – hide them whenever a sheet (detail/filters/alerts/admin) is open
+    const sheets = document.querySelectorAll(".sheet");
+    let paused = false;
+    const sync = async () => { const open = [...sheets].some((x) => !x.classList.contains("hidden")); if (open && !paused) { paused = true; try { await nativeFeed.pause(); } catch (e) {} } else if (!open && paused) { paused = false; try { nativeFeed.resume(); } catch (e) {} } };
+    new MutationObserver(sync).observe(document.body, { attributes: true, subtree: true, attributeFilter: ["class"] });
+    document.addEventListener("visibilitychange", sync);
+    if (state.items.length) render(); // slots become live
+  } catch (e) { console.warn("native ads", e); nativeFeed = null; }
+}
+const nativeSlot = (i) => (nativeFeed ? `<div class="card ad-slot"><capacitor-admob-native feed-id="list" slot-key="ad-${esc(i.id)}" style="display:block;height:120px"></capacitor-admob-native></div>` : "");
+// ---- App Open ad: shown when the user comes back to the app (not on first launch) ----
+function initAppOpen() {
+  if (!isNative || !AdMob || !AdMob.prepareAppOpen || !window.ADMOB.appOpenId || !CapApp) return;
+  const opts = { adId: window.ADMOB.appOpenId, isTesting: window.ADMOB.testing };
+  let ready = false, lastShown = 0;
+  const prep = () => AdMob.prepareAppOpen(opts).then(() => (ready = true)).catch(() => (ready = false));
+  prep();
+  CapApp.addListener("appStateChange", async ({ isActive }) => {
+    if (!isActive) return;
+    if (ready && Date.now() - lastShown > 4 * 60000) { ready = false; try { await AdMob.showAppOpen(); lastShown = Date.now(); } catch (e) {} }
+    prep();
+  });
 }
 // Interstitial: on the first scholarship opened in this session, then at most one every M minutes
 // (never on app launch itself – AdMob policy forbids interstitials on load)
@@ -275,7 +311,7 @@ function render() {
   const list = $("#list");
   if (!state.items.length) { list.innerHTML = '<div class="empty">No opportunities match. Try clearing filters.</div>'; $("#more").classList.add("hidden"); return; }
   list.innerHTML = state.items.map((i, idx) => `
-    ${idx > 0 && idx % 8 === 0 && !isNative ? '<div class="ad-card">Advertisement</div>' : ""}
+    ${idx > 0 && idx % 4 === 0 ? (isNative ? nativeSlot(i) : '<div class="ad-card">Advertisement</div>') : ""}
     <div class="card" data-id="${esc(i.id)}">
       <button class="star ${saved.has(i.id) ? "on" : ""}" data-star="${esc(i.id)}">★</button>
       <h3>${esc(i.title)}</h3>
