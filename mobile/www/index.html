@@ -33,8 +33,9 @@
 <div id="sheet" class="sheet hidden">
   <div class="sheet-body">
     <h3>Filters</h3>
+    <label>Newly added <select id="fAdded"><option value="">Any time</option><option value="1">Last 24 hours</option><option value="3">Last 3 days</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+    <div class="row gap"><label style="flex:1">Deadline from <input type="date" id="fFrom"></label><label style="flex:1">Deadline to <input type="date" id="fTo"></label></div>
     <label>Level <select id="fLevel"><option value="">Any</option></select></label>
-    <label>Field <select id="fField"><option value="">Any</option></select></label>
     <label>Funding <select id="fFunding"><option value="">Any</option></select></label>
     <label>Source <select id="fTier"><option value="">All sources</option><option value="official">🏛 Official (schools & governments)</option><option value="web">🔎 Found via web search</option><option value="aggregator">Aggregators</option></select></label>
     <label>Country <input id="fCountry" placeholder="e.g. Germany"></label>
@@ -90,6 +91,6 @@
 <script src="vendor/capacitor.js"></script>
 <script src="vendor/admob.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=121"></script>
+<script src="app.js?v=123"></script>
 </body>
 </html>
