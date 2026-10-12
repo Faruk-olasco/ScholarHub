@@ -1,3 +1,4 @@
+
 /* ScholarHub mobile – vanilla JS, talks to Supabase, AdMob via Capacitor plugin. */
 const SB_URL = (window.SUPABASE_URL || "").replace(/\/$/, "") + "/rest/v1";
 const SB_HEADERS = { apikey: window.SUPABASE_ANON_KEY, Authorization: "Bearer " + window.SUPABASE_ANON_KEY, Accept: "application/json" };
@@ -142,7 +143,7 @@ async function initNativeAds() {
   if (!isNative || !AdMobJS || !AdMobJS.NativeAdFeed || !(window.ADMOB.nativeId || window.ADMOB.testing)) return;
   try {
     nativeFeed = await AdMobJS.NativeAdFeed.create({
-      feedId: "list", adId: window.ADMOB.nativeId, isTesting: window.ADMOB.testing, template: AdMobJS.NativeAdTemplate.Small,
+      feedId: "list", adId: window.ADMOB.nativeId, isTesting: window.ADMOB.testing, template: AdMobJS.NativeAdTemplate.Medium,
       style: { backgroundColor: "#1e293b", cornerRadius: 14, headlineColor: "#f1f5f9", bodyColor: "#94a3b8", callToActionBackgroundColor: "#38bdf8", callToActionTextColor: "#0f172a" },
     });
     // if an ad can't be filled, collapse its slot so there is no empty box in the list
@@ -156,7 +157,7 @@ async function initNativeAds() {
     if (state.items.length) render(); // slots become live
   } catch (e) { console.warn("native ads", e); nativeFeed = null; }
 }
-const nativeSlot = (i) => (nativeFeed ? `<div class="card ad-slot"><capacitor-admob-native feed-id="list" slot-key="ad-${esc(i.id)}" style="display:block;height:120px"></capacitor-admob-native></div>` : "");
+const nativeSlot = (i) => (nativeFeed ? `<div class="card ad-slot"><capacitor-admob-native feed-id="list" slot-key="ad-${esc(i.id)}" style="display:block;height:300px"></capacitor-admob-native></div>` : "");
 // ---- App Open ad: shown when the user comes back to the app (not on first launch) ----
 function initAppOpen() {
   if (!isNative || !AdMob || !AdMob.prepareAppOpen || !window.ADMOB.appOpenId || !CapApp) return;
@@ -170,7 +171,7 @@ function initAppOpen() {
     prep();
   });
 }
-// Interstitial: on the first scholarship opened in this session, then at most one every M minutes
+// Interstitial: first scholarship opened / tab switch / 2nd+ "Load more" in this session, then at most one every M minutes (all triggers share the cap)
 // (never on app launch itself – AdMob policy forbids interstitials on load)
 let lastInterstitialAt = 0;
 async function maybeInterstitial() {
@@ -438,7 +439,8 @@ $("#list").addEventListener("click", (e) => {
   const card = e.target.closest(".card"); if (!card) return;
   const i = state.items.find((x) => x.id === card.dataset.id); if (i) openDetail(i);
 });
-$("#more").onclick = () => load(false);
+let loadMoreTaps = 0;
+$("#more").onclick = async () => { await load(false); if (++loadMoreTaps > 1) maybeInterstitial(); }; // natural break point: after the next page has loaded (never on the first "Load more")
 function doSearch(closeKeyboard) {
   const q = $("#q").value.trim();
   if (q !== state.q) { state.q = q; load(true); }
@@ -459,7 +461,7 @@ let ptrY = 0, ptrOn = false;
 document.addEventListener("touchstart", (e) => { ptrY = e.touches[0].clientY; ptrOn = window.scrollY <= 0; }, { passive: true });
 document.addEventListener("touchmove", (e) => { if (!ptrOn) return; const d = e.touches[0].clientY - ptrY; if ($("#ptr")) $("#ptr").style.height = Math.min(Math.max(d / 2, 0), 60) + "px"; }, { passive: true });
 document.addEventListener("touchend", (e) => { const d = e.changedTouches[0].clientY - ptrY; if ($("#ptr")) $("#ptr").style.height = "0px"; if (ptrOn && d > 110) refresh(); ptrOn = false; }, { passive: true });
-document.querySelectorAll(".tabs [data-tab]").forEach((b) => (b.onclick = () => { document.querySelectorAll(".tabs [data-tab]").forEach((x) => x.classList.remove("on")); b.classList.add("on"); state.tab = b.dataset.tab; load(); window.scrollTo(0, 0); }));
+document.querySelectorAll(".tabs [data-tab]").forEach((b) => (b.onclick = () => { document.querySelectorAll(".tabs [data-tab]").forEach((x) => x.classList.remove("on")); b.classList.add("on"); state.tab = b.dataset.tab; load(); window.scrollTo(0, 0); maybeInterstitial(); })); // tab switch = natural break point
 $("#filtersBtn").onclick = () => $("#sheet").classList.remove("hidden");
 $("#apply").onclick = () => { state.level = $("#fLevel").value; state.field = $("#fField").value; state.funding = $("#fFunding").value; state.tier = $("#fTier").value; state.country = $("#fCountry").value.trim(); state.expired = $("#fExpired").checked ? 1 : 0; $("#sheet").classList.add("hidden"); load(); };
 $("#clear").onclick = () => { ["fLevel", "fField", "fFunding", "fTier"].forEach((id) => ($("#" + id).value = "")); $("#fCountry").value = ""; $("#fExpired").checked = false; };
