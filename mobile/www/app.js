@@ -1,4 +1,3 @@
-
 /* ScholarHub mobile – vanilla JS, talks to Supabase, AdMob via Capacitor plugin. */
 const SB_URL = (window.SUPABASE_URL || "").replace(/\/$/, "") + "/rest/v1";
 const SB_HEADERS = { apikey: window.SUPABASE_ANON_KEY, Authorization: "Bearer " + window.SUPABASE_ANON_KEY, Accept: "application/json" };
@@ -47,7 +46,7 @@ async function openById(id) {
 function idFromUrl(u) { try { return new URL(u).searchParams.get("s"); } catch (e) { return null; } }
 
 const $ = (s) => document.querySelector(s);
-const state = { tab: "all", region: "", newOnly: 0, q: "", level: "", field: "", funding: "", tier: "", country: "", expired: 0, offset: 0, items: [], total: 0, detailOpens: 0 };
+const state = { tab: "all", region: "", newOnly: 0, q: "", level: "", field: "", funding: "", tier: "", country: "", added: 0, dlFrom: "", dlTo: "", expired: 0, offset: 0, items: [], total: 0, detailOpens: 0 };
 const saved = new Set(JSON.parse(localStorage.getItem("saved") || "[]"));
 const savedItems = JSON.parse(localStorage.getItem("savedItems") || "{}");
 // My Plan: personal to-do list + per-scholarship notes (stored on the phone only)
@@ -196,7 +195,9 @@ function buildQuery(offset) {
   if (state.funding) p.set("funding", like(state.funding));
   if (state.country) p.set("countries", like(state.country));
   if (state.tab === "official") p.set("tier", "eq.official"); else if (state.tier) p.set("tier", "eq." + state.tier);
+  if (state.added) p.append("first_seen", "gte." + new Date(Date.now() - state.added * 864e5).toISOString());
   if (state.tab === "soon") { p.set("deadline", "gte." + today()); p.append("deadline", "lte." + new Date(Date.now() + 21 * 864e5).toISOString().slice(0, 10)); }
+  else if (state.dlFrom || state.dlTo) { if (state.dlFrom) p.append("deadline", "gte." + state.dlFrom); if (state.dlTo) p.append("deadline", "lte." + state.dlTo); } // a date range only makes sense for dated listings
   else if (!state.expired) p.set("or", `(deadline.is.null,deadline.gte.${today()})`);
   // sort: dated & upcoming first (soonest), then open-ended; newest first within
   p.set("order", "deadline.asc.nullslast,published.desc");
@@ -322,7 +323,7 @@ function render() {
       <div class="meta">via ${esc(i.source)} · ${esc((i.published || "").slice(0, 10))}</div>
     </div>`).join("");
   $("#more").classList.toggle("hidden", state.tab === "saved" || state.offset >= state.total);
-  $("#stats").textContent = `${state.total.toLocaleString()} ${state.newOnly ? "new " : ""}opportunities${state.region ? " · " + state.region : ""}${state.newOnly ? " · tap ↻ for all" : ""}`;
+  $("#stats").textContent = `${state.total.toLocaleString()} ${state.newOnly ? "new " : ""}opportunities${state.region ? " · " + state.region : ""}${state.added ? ` · added in last ${state.added === 1 ? "24h" : state.added + " days"}` : ""}${state.dlFrom || state.dlTo ? ` · deadline ${state.dlFrom || "…"} → ${state.dlTo || "…"}` : ""}${state.newOnly ? " · tap ↻ for all" : ""}`;
   api("/app_stats?select=last_run").then((r) => { const t = r.items[0] && r.items[0].last_run; if (t) $("#stats").textContent += ` · updated ${new Date(t).toLocaleString([], { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`; }).catch(() => {});
 }
 let planView = localStorage.getItem("planView") || "todo", editingNote = null;
@@ -463,8 +464,8 @@ document.addEventListener("touchmove", (e) => { if (!ptrOn) return; const d = e.
 document.addEventListener("touchend", (e) => { const d = e.changedTouches[0].clientY - ptrY; if ($("#ptr")) $("#ptr").style.height = "0px"; if (ptrOn && d > 110) refresh(); ptrOn = false; }, { passive: true });
 document.querySelectorAll(".tabs [data-tab]").forEach((b) => (b.onclick = () => { document.querySelectorAll(".tabs [data-tab]").forEach((x) => x.classList.remove("on")); b.classList.add("on"); state.tab = b.dataset.tab; load(); window.scrollTo(0, 0); maybeInterstitial(); })); // tab switch = natural break point
 $("#filtersBtn").onclick = () => $("#sheet").classList.remove("hidden");
-$("#apply").onclick = () => { state.level = $("#fLevel").value; state.field = $("#fField").value; state.funding = $("#fFunding").value; state.tier = $("#fTier").value; state.country = $("#fCountry").value.trim(); state.expired = $("#fExpired").checked ? 1 : 0; $("#sheet").classList.add("hidden"); load(); };
-$("#clear").onclick = () => { ["fLevel", "fField", "fFunding", "fTier"].forEach((id) => ($("#" + id).value = "")); $("#fCountry").value = ""; $("#fExpired").checked = false; };
+$("#apply").onclick = () => { state.level = $("#fLevel").value; state.funding = $("#fFunding").value; state.tier = $("#fTier").value; state.country = $("#fCountry").value.trim(); state.added = +($("#fAdded").value || 0); state.dlFrom = $("#fFrom").value; state.dlTo = $("#fTo").value; state.expired = $("#fExpired").checked ? 1 : 0; $("#sheet").classList.add("hidden"); load(); };
+$("#clear").onclick = () => { ["fLevel", "fFunding", "fTier", "fAdded", "fFrom", "fTo"].forEach((id) => ($("#" + id).value = "")); $("#fCountry").value = ""; $("#fExpired").checked = false; };
 $("#alertsBtn").onclick = openNotifSheet;
 $("#aCancel").onclick = () => $("#alerts").classList.add("hidden");
 $("#nDaily").onchange = () => { $("#nRegionWrap").style.display = $("#nDaily").checked ? "" : "none"; };
@@ -516,7 +517,7 @@ async function init() {
   try {
     const f = FILTERS;
     const fill = (id, arr) => (document.getElementById(id).innerHTML += arr.map((v) => `<option>${esc(v)}</option>`).join(""));
-    fill("fLevel", f.levels); fill("fField", f.fields); fill("fFunding", f.funding);
+    fill("fLevel", f.levels); fill("fFunding", f.funding);
     $("#nRegion").innerHTML += f.regions.map((r) => `<option>${esc(r)}</option>`).join("");
     $("#regionChips").innerHTML = ['<button class="chip on" data-region="">🌍 All</button>'].concat(f.regions.map((r) => `<button class="chip" data-region="${esc(r)}">${esc(r)}</button>`)).join("");
     document.querySelectorAll(".chip").forEach((c) => (c.onclick = () => { document.querySelectorAll(".chip").forEach((x) => x.classList.remove("on")); c.classList.add("on"); state.region = c.dataset.region; load(); }));
