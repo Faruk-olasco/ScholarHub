@@ -22,6 +22,8 @@ jobs:
           packages: 'platform-tools'
       - run: npm install
       - run: npx cap add android
+      - name: App icon + splash (from mobile/resources; without this the APK uses Capacitor's default icon)
+        run: npx --yes @capacitor/assets generate --android --iconBackgroundColor '#0b1a3a' --iconBackgroundColorDark '#0b1a3a' --splashBackgroundColor '#0b1a3a' --splashBackgroundColorDark '#0b1a3a' && ls android/app/src/main/res/mipmap-xxxhdpi
       - name: Firebase config (push notifications)
         if: ${{ env.HAS_FIREBASE == 'true' }}
         env: { GSJ: "${{ secrets.GOOGLE_SERVICES_JSON }}" }
