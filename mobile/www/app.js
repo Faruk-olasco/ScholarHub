@@ -221,6 +221,7 @@ let loadSeq = 0;
 async function load(reset = true) {
   const seq = ++loadSeq; // ignore responses from older requests (fixes unrelated results while typing)
   if (reset) { state.offset = 0; state.items = []; $("#list").innerHTML = '<div class="loading">Loading opportunities…</div>'; }
+  if (reset && state.tab === "all") loadAnnouncement();
   if (state.tab === "saved") { state.items = Object.values(savedItems); state.total = state.items.length; render(); return; }
   if (state.tab === "plan") { renderPlan(); return; }
   try {
@@ -237,6 +238,22 @@ async function load(reset = true) {
     else $("#list").innerHTML = '<div class="empty">Could not reach the server. Check your internet connection.</div>';
     setOffline(true);
   }
+}
+// ---------- Announcement (admin-managed: Supabase table `announcements`; RLS only exposes active rows in their date window) ----------
+async function loadAnnouncement() {
+  const box = $("#ann"); if (!box) return;
+  try {
+    const r = await api("/announcements?select=id,title,body,link_url,link_text&order=created_at.desc&limit=1");
+    const a = r.items[0];
+    if (!a) { box.classList.add("hidden"); box.innerHTML = ""; localStorage.removeItem("ann"); return; }
+    localStorage.setItem("ann", JSON.stringify(a)); showAnnouncement(a);
+  } catch (e) { const c = JSON.parse(localStorage.getItem("ann") || "null"); if (c) showAnnouncement(c); } // offline: keep the last one seen
+}
+function showAnnouncement(a) {
+  const box = $("#ann");
+  const link = a.link_url && /^https?:\/\//i.test(a.link_url) ? `<div><button data-ann-link="${esc(a.link_url)}">${esc(a.link_text || "Open link →")}</button></div>` : "";
+  box.innerHTML = `<div class="ann-tag">📣 Announcement</div>${a.title ? `<b>${esc(a.title)}</b>` : ""}${a.body ? `<p>${esc(a.body)}</p>` : ""}${link}`;
+  box.classList.remove("hidden");
 }
 function setOffline(on) {
   let b = $(".offline");
@@ -426,6 +443,7 @@ function toggleSave(i) {
 }
 
 // ---------- events ----------
+$("#ann").addEventListener("click", (e) => { const b = e.target.closest("[data-ann-link]"); if (b) openUrl(b.dataset.annLink); });
 $("#list").addEventListener("click", (e) => {
   if (e.target.closest("[data-boost]")) { nextBoost(); return; }
   const dn = e.target.closest("[data-done]");
