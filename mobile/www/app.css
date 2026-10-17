@@ -71,3 +71,11 @@ main{padding:0 12px;display:flex;flex-direction:column;gap:10px}
 .toast-q{font-size:13px;line-height:1.4;color:#e0e7ff;font-style:italic}
 .toast-x{position:absolute;top:6px;right:6px;background:rgba(255,255,255,.08);border:0;color:#c7d2fe;border-radius:10px;font-size:14px;padding:5px 9px}
 .disclaimer{margin:0 12px 10px;padding:8px 10px;border-radius:10px;background:#111827;border:1px solid #273449;color:var(--muted);font-size:11px;line-height:1.4}
+
+/* Boot splash (shown until the App Open ad has been handled on cold launch) */
+#boot{position:fixed;inset:0;z-index:9999;background:#0b1a3a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .3s}
+#boot.out{opacity:0;pointer-events:none}
+#boot .boot-logo{font-size:64px}
+#boot .boot-name{font-size:28px;font-weight:800;color:#f1f5f9}
+#boot .boot-name span{color:#38bdf8}
+#boot .boot-sub{color:#94a3b8;font-size:14px}
