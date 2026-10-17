@@ -27,14 +27,67 @@ async function openUrl(url) {
   } catch (e) {}
   const w = window.open(url, "_blank"); if (!w) location.href = url;
 }
+const PLAY_URL = "https://play.google.com/store/apps/details?id=com.scholarhub.app";
+const FS = Cap && Cap.Plugins && Cap.Plugins.Filesystem; // used only to hand the card image to the share sheet
+// Draw the scholarship card as an image (what the receiver sees in WhatsApp/Telegram), 1080px wide
+function cardImage(i) {
+  const W = 1080, P = 56, c = document.createElement("canvas"), x = c.getContext("2d");
+  const font = (px, w = 400) => (x.font = `${w} ${px}px system-ui, Roboto, "Noto Color Emoji", sans-serif`);
+  const wrap = (txt, px, w, maxW, maxLines) => { font(px, w); const out = []; let line = ""; for (const word of String(txt || "").split(/\s+/)) { const t = line ? line + " " + word : word; if (x.measureText(t).width > maxW && line) { out.push(line); line = word; if (out.length === maxLines) break; } else line = t; } if (out.length < maxLines && line) out.push(line); if (out.length === maxLines && x.measureText(out[maxLines - 1]).width > maxW - 30) out[maxLines - 1] = out[maxLines - 1].replace(/\s?\S*$/, "") + "…"; return out; };
+  const rr = (X, Y, w, h, r, fill, stroke) => { x.beginPath(); x.roundRect(X, Y, w, h, r); if (fill) { x.fillStyle = fill; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.lineWidth = 2; x.stroke(); } };
+  // measure first
+  const titleLines = wrap(i.title, 50, 800, W - 2 * P, 4);
+  const sumLines = wrap(i.summary, 32, 400, W - 2 * P, 4);
+  const tagList = [i.tier === "official" ? "🏛 official" : "", i.funding, ...(i.levels || "").split(", ").filter(Boolean).slice(0, 2), ...(i.countries || "").split(", ").filter(Boolean).slice(0, 2)].filter(Boolean);
+  let days = null, dlTxt = "🟢 Open — apply now (no deadline stated)", dlCol = "#34d399";
+  if (i.deadline) { days = Math.round((new Date(i.deadline) - new Date().setHours(0, 0, 0, 0)) / 864e5); dlTxt = `⏰ Deadline ${i.deadline} (${days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left"})`; dlCol = days < 0 ? "#f87171" : days <= 14 ? "#fbbf24" : "#34d399"; }
+  const H = 150 + titleLines.length * 62 + 60 + sumLines.length * 44 + (tagList.length ? 80 : 20) + 60 + 232 + 150;
+  c.width = W; c.height = H;
+  x.fillStyle = "#0f172a"; x.fillRect(0, 0, W, H);
+  // header
+  font(40, 800); x.fillStyle = "#e2e8f0"; x.fillText("🎓 Scholar", P, 80); const sw = x.measureText("🎓 Scholar").width; x.fillStyle = "#38bdf8"; x.fillText("Hub", P + sw, 80);
+  font(26, 700); x.fillStyle = "#34d399"; x.textAlign = "right"; x.fillText("● LIVE", W - P, 76); x.textAlign = "left";
+  // card
+  const cy = 120; rr(P - 20, cy, W - 2 * P + 40, H - cy - 130, 28, "#1e293b", "#273449");
+  let y = cy + 80; font(50, 800); x.fillStyle = "#f1f5f9"; for (const l of titleLines) { x.fillText(l, P + 10, y); y += 62; }
+  y += 6; font(30, 700); x.fillStyle = dlCol; x.fillText(dlTxt, P + 10, y); y += 54;
+  font(32, 400); x.fillStyle = "#94a3b8"; for (const l of sumLines) { x.fillText(l, P + 10, y); y += 44; }
+  if (tagList.length) { y += 12; let tx = P + 10; font(26, 600); for (const t of tagList) { const w = x.measureText(t).width + 36; if (tx + w > W - P) break; rr(tx, y - 30, w, 46, 23, "#0f172a", "#334155"); x.fillStyle = t === i.funding ? "#34d399" : t.startsWith("🏛") ? "#c084fc" : "#94a3b8"; x.fillText(t, tx + 18, y + 2); tx += w + 12; } y += 60; }
+  font(26, 400); x.fillStyle = "#64748b"; x.fillText(`via ${i.source || ""}`, P + 10, y + 10);
+  // official link shown as plain text (proof of source; an image can't be tapped)
+  font(24, 400); x.fillStyle = "#38bdf8"; let link = String(i.url || "").replace(/^https?:\/\//, ""); while (x.measureText(link).width > W - 2 * P - 20 && link.length > 10) link = link.slice(0, -2); if (link !== String(i.url || "").replace(/^https?:\/\//, "")) link += "…"; x.fillText("🔗 " + link, P + 10, y + 50);
+  // action buttons, exactly like the detail screen (shows the tracking features)
+  const btn = (X, Y, w, label, filled) => { rr(X, Y, w, 64, 16, filled ? "#38bdf8" : "#0f172a", filled ? null : "#334155"); font(26, 700); x.fillStyle = filled ? "#0f172a" : "#94a3b8"; x.textAlign = "center"; x.fillText(label, X + w / 2, Y + 41); x.textAlign = "left"; };
+  const bx = P + 10, bw = W - 2 * P - 20, g = 14; y += 90;
+  const w3 = (bw - 2 * g) / 3; btn(bx, y, w3, "☆ Save", false); btn(bx + w3 + g, y, w3, "Share", false); btn(bx + 2 * (w3 + g), y, w3, "Apply / Details ↗", true);
+  y += 64 + g; const w2 = (bw - g) / 2; btn(bx, y, w2, "＋ Add to plan", false); btn(bx + w2 + g, y, w2, "📝 Add to opportunity note", false);
+  // footer: Play Store call-to-action
+  const fy = H - 100; rr(P, fy, W - 2 * P, 70, 18, "#38bdf8"); font(30, 800); x.fillStyle = "#0f172a"; x.textAlign = "center"; const lbl = "Get ScholarHub free on Google Play"; const lw = x.measureText(lbl).width; x.fillText(lbl, W / 2 + 22, fy + 46); x.textAlign = "left";
+  // drawn down-arrow (not an emoji, so it shows on every device): points to the link under the picture
+  const ax = W / 2 - lw / 2 - 20, ay = fy + 35; x.fillStyle = "#0f172a"; x.fillRect(ax - 6, ay - 20, 12, 24); x.beginPath(); x.moveTo(ax - 16, ay + 2); x.lineTo(ax + 16, ay + 2); x.lineTo(ax, ay + 20); x.closePath(); x.fill();
+  return c.toDataURL("image/png");
+}
 async function shareItem(i) {
-  const link = shareLink(i);
-  // Scholarship page first (chat apps preview the FIRST link → shows the real site's title/image), then our app link
-  const text = "🎓 " + i.title + (i.deadline ? "\n⏰ Deadline: " + i.deadline : "") + (i.url && i.url !== link ? "\n" + i.url : "") + "\n\n📲 Open in ScholarHub (more scholarships, deadline tracking): " + link;
-  // link is already inside `text`; passing it as `url` too makes Android show it twice
+  const text = "🎓 " + i.title + (i.deadline ? "\n⏰ Deadline: " + i.deadline : "") + "\n\n📲 Get ScholarHub free on Google Play – scholarships worldwide, updated twice a day:\n" + PLAY_URL;
+  // 1) native: save the card image to cache and share image + text
+  try {
+    if (Share && Share.share && FS && FS.writeFile) {
+      const data = cardImage(i).split(",")[1];
+      const f = await FS.writeFile({ path: "share-" + Date.now() + ".png", data, directory: "CACHE" });
+      return await Share.share({ title: i.title, text, files: [f.uri], dialogTitle: "Share scholarship" });
+    }
+  } catch (e) { console.warn("image share failed", e); }
+  // 2) web: share the image file if the browser supports it
+  try {
+    if (navigator.share && navigator.canShare) {
+      const blob = await (await fetch(cardImage(i))).blob(); const file = new File([blob], "scholarhub.png", { type: "image/png" });
+      if (navigator.canShare({ files: [file] })) return await navigator.share({ title: i.title, text, files: [file] });
+    }
+  } catch (e) {}
+  // 3) fallbacks: text only
   try { if (Share && Share.share) return await Share.share({ title: i.title, text, dialogTitle: "Share scholarship" }); } catch (e) {}
   try { if (navigator.share) return await navigator.share({ title: i.title, text }); } catch (e) {}
-  try { await navigator.clipboard.writeText(text); alert("Link copied"); } catch (e) { prompt("Copy link", link); }
+  try { await navigator.clipboard.writeText(text); alert("Copied"); } catch (e) { prompt("Copy", text); }
 }
 // Deep link: open a specific scholarship by id (from a shared link)
 async function openById(id) {
@@ -320,7 +373,7 @@ function deadlineHtml(d) {
   if (!d) return '<div class="dl ok">🟢 Open — apply now (no deadline stated)</div>';
   const days = Math.round((new Date(d) - new Date().setHours(0, 0, 0, 0)) / 864e5);
   const cls = days < 0 ? "past" : days <= 14 ? "soon" : "ok";
-  const txt = days < 0 ? "expired" : days === 0 ? "today!" : days + " days left";
+  const txt = days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left";
   return `<div class="dl ${cls}">⏰ Deadline ${d} (${txt})</div>`;
 }
 function tags(i) {
