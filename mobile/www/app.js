@@ -157,17 +157,23 @@ async function initNativeAds() {
   } catch (e) { console.warn("native ads", e); nativeFeed = null; }
 }
 const nativeSlot = (i) => (nativeFeed ? `<div class="card ad-slot"><capacitor-admob-native feed-id="list" slot-key="ad-${esc(i.id)}" style="display:block;height:300px"></capacitor-admob-native></div>` : "");
-// ---- App Open ad: shown when the user comes back to the app (not on first launch) ----
+// ---- App Open ad: cold launch (behind a short branded loading screen) + when the user comes back to the app ----
 function initAppOpen() {
   if (!isNative || !AdMob || !AdMob.prepareAppOpen || !window.ADMOB.appOpenId || !CapApp) return;
   const opts = { adId: window.ADMOB.appOpenId, isTesting: window.ADMOB.testing };
   let ready = false, lastShown = 0;
   const prep = () => AdMob.prepareAppOpen(opts).then(() => (ready = true)).catch(() => (ready = false));
-  prep();
+  const show = async () => { ready = false; try { await AdMob.showAppOpen(); lastShown = Date.now(); } catch (e) {} prep(); };
+  // cold launch: wait up to 4s for the ad behind the loading screen; if it isn't ready by then, start the app without it
+  const boot = $("#boot");
+  const hideBoot = () => { if (boot) { boot.classList.add("out"); setTimeout(() => boot.remove(), 350); } };
+  let done = false;
+  const finish = () => { if (!done) { done = true; hideBoot(); } };
+  prep().then(() => { if (!done && ready) { done = true; show().finally(hideBoot); } else finish(); });
+  setTimeout(finish, 4000);
   CapApp.addListener("appStateChange", async ({ isActive }) => {
     if (!isActive) return;
-    if (ready && Date.now() - lastShown > 4 * 60000) { ready = false; try { await AdMob.showAppOpen(); lastShown = Date.now(); } catch (e) {} }
-    prep();
+    if (ready && Date.now() - lastShown > 4 * 60000) await show(); else if (!ready) prep();
   });
 }
 // Interstitial: first scholarship opened / tab switch / 2nd+ "Load more" in this session, then at most one every M minutes (all triggers share the cap)
@@ -513,6 +519,9 @@ $("#pQueue").onclick = async () => {
 
 // ---------- init ----------
 async function init() {
+  const boot = $("#boot");
+  if (boot && (!isNative || !AdMob || !(window.ADMOB && window.ADMOB.appOpenId))) boot.remove(); // no app-open ad possible → no loading screen
+  setTimeout(() => { const b = $("#boot"); if (b) b.remove(); }, 7000); // hard fallback: never leave the loading screen stuck
   initAds();
   try {
     const f = FILTERS;
