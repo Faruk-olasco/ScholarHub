@@ -1,7 +1,7 @@
 :root{--bg:#0f172a;--card:#1e293b;--muted:#94a3b8;--txt:#e2e8f0;--acc:#38bdf8;--ok:#34d399;--warn:#fbbf24;--bad:#f87171;--safe-top:env(safe-area-inset-top);--safe-bottom:env(safe-area-inset-bottom)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Roboto,sans-serif;font-size:15px}
-body{padding-bottom:calc(60px + var(--safe-bottom) + var(--ad-h,0px))}
+body{padding-bottom:calc(68px + var(--safe-bottom) + var(--ad-h,0px))}
 header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(10px + var(--safe-top)) 16px 6px;display:flex;justify-content:space-between;align-items:center}
 .brand{font-weight:800;font-size:20px}.brand span{color:var(--acc)}
 .live{font-size:12px;color:var(--ok);font-weight:700;animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.35}}
@@ -65,14 +65,14 @@ main{padding:0 12px;display:flex;flex-direction:column;gap:10px}
 .boost-tag{font-size:11px;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
 .boost-q{font-size:14px;line-height:1.45;color:#e0e7ff;font-style:italic}
 .boost-next{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.08);border:0;color:#c7d2fe;border-radius:10px;font-size:16px;padding:4px 8px}
-.toast{position:fixed;left:12px;right:12px;bottom:calc(64px + var(--safe-bottom) + var(--ad-h,0px));z-index:15;background:linear-gradient(135deg,#1e3a5f,#312e81);border:1px solid #3b4fa0;border-radius:14px;padding:10px 40px 10px 14px;box-shadow:0 8px 24px rgba(0,0,0,.45);transform:translateY(20px);opacity:0;transition:transform .3s,opacity .3s;pointer-events:auto}
+.toast{position:fixed;left:12px;right:12px;bottom:calc(72px + var(--safe-bottom) + var(--ad-h,0px));z-index:15;background:linear-gradient(135deg,#1e3a5f,#312e81);border:1px solid #3b4fa0;border-radius:14px;padding:10px 40px 10px 14px;box-shadow:0 8px 24px rgba(0,0,0,.45);transform:translateY(20px);opacity:0;transition:transform .3s,opacity .3s;pointer-events:auto}
 .toast.in{transform:none;opacity:1}
 .toast-tag{font-size:11px;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
 .toast-q{font-size:13px;line-height:1.4;color:#e0e7ff;font-style:italic}
 .toast-x{position:absolute;top:6px;right:6px;background:rgba(255,255,255,.08);border:0;color:#c7d2fe;border-radius:10px;font-size:14px;padding:5px 9px}
 .disclaimer{margin:0 12px 10px;padding:8px 10px;border-radius:10px;background:#111827;border:1px solid #273449;color:var(--muted);font-size:11px;line-height:1.4}
 
-/* Boot splash (shown until the App Open ad has been handled on cold launch) */
+/* cold-launch loading screen (native only; hidden on web) */
 #boot{position:fixed;inset:0;z-index:9999;background:#0b1a3a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .3s}
 #boot.out{opacity:0;pointer-events:none}
 #boot .boot-logo{font-size:64px}
@@ -86,3 +86,40 @@ main{padding:0 12px;display:flex;flex-direction:column;gap:10px}
 .ann b{font-size:12px;margin-right:4px}
 .ann p{display:inline;margin:0;font-size:12px;line-height:1.35;color:#fff;white-space:pre-wrap}
 .ann button{display:inline-block;margin-top:5px;padding:4px 9px;border-radius:8px;border:0;background:#fff;color:#b91c1c;font-weight:700;font-size:12px}
+
+/* ---------- v1.4: coloured tab bar (icon above label, solid fill when active) ---------- */
+.tabs{padding:4px 2px calc(4px + var(--safe-bottom))}
+.tabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;line-height:1.1;padding:5px 1px;min-width:0;color:var(--muted);--c:var(--acc);border-radius:10px}
+.tabs button i{font-style:normal;font-size:16px;line-height:1;color:var(--c)}
+.tabs .c-all{--c:#38bdf8}.tabs .c-soon{--c:#fbbf24}.tabs .c-off{--c:#c084fc}.tabs .c-news{--c:#34d399}.tabs .c-tech{--c:#60a5fa}.tabs .c-saved{--c:#f472b6}.tabs .c-plan{--c:#fb923c}.tabs .c-bell{--c:#f87171}
+.tabs button.on{background:var(--c);color:#0f172a;font-weight:700}.tabs button.on i{color:#0f172a}
+/* deep buttons under the region chips */
+.hub{display:flex;gap:10px;margin:6px 12px 10px}
+.hubbtn{flex:1;padding:14px 8px;border-radius:14px;border:0;color:#fff;font:inherit;font-weight:800;font-size:15px;text-align:center;box-shadow:0 6px 0 var(--sh),0 10px 18px rgba(0,0,0,.45);transition:transform .08s,box-shadow .08s}
+.hubbtn:active{transform:translateY(4px);box-shadow:0 2px 0 var(--sh)}
+.hubbtn.news{background:#047857;--sh:#064e3b}.hubbtn.tech{background:#1d4ed8;--sh:#1e3a8a}
+/* while inside School News / Tech the scholarship-only controls are hidden (they never apply to news) */
+body.mode-news .chips,body.mode-news .hub,body.mode-news #ann{display:none}
+/* news cards: title first (same size/weight as scholarship cards), category pill pinned top-right */
+.ncard{background:var(--card);border:1px solid #273449;border-radius:14px;padding:14px;margin:0;position:relative}
+.ncard h3{margin:0 0 6px;font-size:15px;line-height:1.35;font-weight:700;color:var(--txt)}
+.ncard.has-pill h3{padding-right:96px}
+.ncard p{margin:0;color:var(--muted);font-size:13px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ntype{position:absolute;top:12px;right:12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;border-radius:999px;border:1px solid #334155;color:var(--muted);background:var(--card)}
+.ntype.adm{color:#34d399;border-color:#34d399}.ntype.sch{color:#c084fc;border-color:#c084fc}.ntype.fee{color:#fbbf24;border-color:#fbbf24}.ntype.urg{color:#f87171;border-color:#f87171}.ntype.cal{color:#60a5fa;border-color:#60a5fa}.ntype.off{color:#e2e8f0;border-color:#475569}
+.nmeta{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px;color:#64748b;gap:8px}
+.nmeta .src{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nmeta .go{flex:0 0 auto;color:var(--acc);font-weight:600}
+.ndot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(52,211,153,.2);margin:0 8px 2px 0;vertical-align:middle}
+
+/* ---- v1.4 pictures (Flipboard style): same slot for scholarships, School News and Tech ---- */
+.card.has-img,.ncard.has-img{padding-top:0;overflow:hidden}
+.nimg{margin:0 -14px 12px;aspect-ratio:16/9;background:#1e293b;overflow:hidden}
+.nimg img{width:100%;height:100%;object-fit:cover;display:block}
+.nimg.hero{margin:-4px 0 14px;border-radius:12px}
+.nlogo{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;padding:10px 14px;box-sizing:border-box}
+.nlogo img{max-width:94%;max-height:86%;width:auto;height:auto;object-fit:contain}
+.nlogo img.tall{height:86%;width:auto}
+.card.has-img .star{top:8px;right:8px;background:rgba(15,23,42,.75);border-radius:50%;width:34px;height:34px;line-height:26px;text-align:center;color:#e2e8f0;backdrop-filter:blur(4px)}
+.card.has-img .star.on{color:var(--warn)}
+.ncard.has-img .ntype{top:12px;right:12px;background:rgba(15,23,42,.85);backdrop-filter:blur(4px)}
+.ncard.has-img.has-pill h3{padding-right:0}
