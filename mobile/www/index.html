@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>ScholarHub</title>
-<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="app.css?v=129">
 </head>
 <body>
 <div id="boot"><div class="boot-logo">🎓</div><div class="boot-name">Scholar<span>Hub</span></div><div class="boot-sub">Loading opportunities…</div></div>
@@ -21,6 +21,7 @@
 </div>
 
 <div class="chips" id="regionChips"></div>
+<div class="hub"><button id="newsBtn" class="hubbtn news">🏫 School News Update</button><button id="techBtn" class="hubbtn tech">💻 Tech Updates</button></div>
 
 <div class="stats" id="stats"></div>
 <div class="disclaimer">ℹ️ ScholarHub is an independent app, not affiliated with any government, university or scholarship provider. Always verify and apply on the official website linked in each listing.</div>
@@ -74,7 +75,7 @@
   <div class="sheet-body">
     <h3>🔔 Notifications</h3>
     <p class="muted" id="nStatus">Choose what you'd like to be reminded about.</p>
-    <label class="row"><input type="checkbox" id="nDaily"> <span><b>New scholarships</b> – get notified whenever new opportunities are added (we check twice a day)</span></label>
+    <label class="row"><input type="checkbox" id="nDaily"> <span><b>Daily picks</b> – five short updates a day: scholarships in the morning and evening, a school news story, a tech story and one closing-soon deadline</span></label>
     <label id="nRegionWrap">For which region? <select id="nRegion"><option value="">🌍 Worldwide (all)</option></select></label>
     <label class="row"><input type="checkbox" id="nDeadlines"> <span><b>Deadline reminders</b> – a daily countdown for the last 14 days before the deadline of anything you've saved or added to your Plan</span></label>
     <p class="muted" id="nHint" style="font-size:12px"></p>
@@ -83,17 +84,19 @@
 </div>
 
 <nav class="tabs">
-  <button data-tab="all" class="on">All</button>
-  <button data-tab="soon">Closing soon</button>
-  <button data-tab="official">🏛 Official</button>
-  <button data-tab="saved">★ Saved</button>
-  <button data-tab="plan">📝 Plan</button>
-  <button id="alertsBtn">🔔</button>
+  <button data-tab="all" class="on c-all"><i>🌐</i>All</button>
+  <button data-tab="soon" class="c-soon"><i>⏰</i>Closing soon</button>
+  <button data-tab="official" class="c-off"><i>🏛</i>Official</button>
+  <button data-tab="news" class="c-news"><i>🏫</i>School News</button>
+  <button data-tab="tech" class="c-tech"><i>💻</i>Tech</button>
+  <button data-tab="saved" class="c-saved"><i>★</i>Saved</button>
+  <button data-tab="plan" class="c-plan"><i>📝</i>Plan</button>
+  <button id="alertsBtn" class="c-bell"><i>🔔</i>Alerts</button>
 </nav>
 
 <script src="vendor/capacitor.js"></script>
 <script src="vendor/admob.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=126"></script>
+<script src="app.js?v=129"></script>
 </body>
 </html>
