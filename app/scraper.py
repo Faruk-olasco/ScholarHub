@@ -267,12 +267,12 @@ def normalise(entry, source_name, fetch_full=False):
             break
     deadline = extract_deadline(text)
     found_links = {}
-    if fetch_full and link.startswith("http") and (deadline is None or publisher):
+    if fetch_full and link.startswith("http") and (deadline is None or publisher or looks_like_nav(body)):
         full, raw = page_fetch(link)
         if full:
             deadline = deadline or extract_deadline(full)
             text = text + " " + full
-            if len(body) < 200: body = full[:600]
+            if len(body) < 200 or looks_like_nav(body): body = page_summary(raw) or (full[:600] if not looks_like_nav(full[:600]) else body)
             from .discovery import official_links
             found_links = official_links(raw, urlparse(link).netloc.replace("www.", ""))
     countries = [c for c in COUNTRIES if re.search(r"\b" + re.escape(c) + r"\b", text, re.I)]
@@ -342,6 +342,48 @@ def page_fetch(url):
         return "", ""
 
 
+NAV_JUNK = re.compile(r"\b(home|log ?in|sign ?up|sign ?in|menu|contact us|about us|privacy|cookies?|subscribe|newsletter|skip to (main )?content|search|all \d[\d,]* scholarships|"
+                      r"updated \d{1,2} \w{3} \d{4}|read more|click here|toggle|navigation|share this|follow us|facebook|twitter|whatsapp|telegram)\b", re.I)
+
+
+def looks_like_nav(text):
+    """True when a snippet is menu/boilerplate rather than prose (many short capitalised tokens, nav words, no sentences)."""
+    t = (text or "").strip()
+    if len(t) < 40: return True
+    head = t[:220]
+    junk_hits = len(NAV_JUNK.findall(head))
+    words = head.split()
+    caps = sum(1 for w in words if w[:1].isupper()) / max(1, len(words))
+    sentences = len(re.findall(r"[a-z][.!?](\s|$)", head))
+    return junk_hits >= 2 or (caps > 0.6 and sentences == 0) or ("·" in head and junk_hits >= 1)
+
+
+def page_summary(raw_html):
+    """Best human-readable description of a page: meta description, else the first real paragraphs."""
+    if not raw_html: return ""
+    try:
+        soup = BeautifulSoup(raw_html, "html.parser")
+        meta = ""
+        for sel in ({"property": "og:description"}, {"name": "description"}, {"name": "twitter:description"}):
+            m = soup.find("meta", attrs=sel)
+            if m and m.get("content"):
+                d = clean(m["content"])
+                if len(d) >= 80 and not looks_like_nav(d): meta = d[:600]; break
+        for t in soup(["script", "style", "nav", "header", "footer", "aside", "form", "button", "select"]): t.decompose()
+        root = soup.find("article") or soup.find("main") or soup.find(attrs={"class": re.compile(r"entry-content|post-content|article|content-body|single", re.I)}) or soup.body or soup
+        paras = []
+        for ptag in root.find_all(["p", "li"]):
+            txt = clean(ptag.get_text(" "))
+            if len(txt) >= 60 and not looks_like_nav(txt) and len(txt.split()) >= 10:
+                paras.append(txt)
+            if sum(len(x) for x in paras) >= 500: break
+        out = " ".join(paras)[:600]
+        if len(out) >= 120: return out           # real article text beats a (often templated) meta description
+        return meta or (out if len(out) >= 60 else "")
+    except Exception:
+        return ""
+
+
 def page_text(url):
     try:
         r = _session.get(url, headers=BROWSER_HEADERS, timeout=(5, 10))
@@ -372,6 +414,7 @@ def harvest_html(html_text, base_url, source_name, known_urls=(), detail_limit=6
         body = ""
         if href not in known_urls and fetched < detail_limit:
             body = page_text(href); fetched += 1
+        if body and looks_like_nav(body[:600]): body = page_summary(page_fetch(href)[1]) or ""
         entry = {"title": text, "link": href, "summary": body or f"Official listing from {source_name} ({host}). Open the link for eligibility, benefits and deadline."}
         it = normalise(entry, source_name)
         if it:
