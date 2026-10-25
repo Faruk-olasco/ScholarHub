@@ -154,7 +154,7 @@ def main():
         day_start = (now + timedelta(hours=off)).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=off)
         already = SB.table("notif_log").select("id").eq("topic", topic).eq("slot", slot).gte("sent_at", day_start.isoformat()).limit(1).execute().data
         if already and not force_slot: log.info("%s/%s already sent today", topic, slot); continue
-        try: sent += run_slot(project, token, slot and topic, slot, region) if False else run_slot(project, token, topic, slot, region)
+        try: sent += run_slot(project, token, topic, slot, region)
         except Exception as e: log.warning("%s/%s failed: %s", topic, slot, e)
     log.info("done: %d messages", sent)
 
