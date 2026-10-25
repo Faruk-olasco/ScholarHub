@@ -46,7 +46,9 @@ def process(src):
     res = scraper.fetch_source(src["name"], src["url"], src["kind"], src.get("etag"), src.get("last_modified"), known)
     items = []
     for it in res["items"]:
-        items.append({k: v for k, v in it.items() if k not in ("found_links", "content_hash")})
+        row = {k: v for k, v in it.items() if k not in ("found_links", "content_hash")}
+        row["_found"] = it.get("found_links") or {}          # in-memory only (stripped before upsert) – helps the logo lookup
+        items.append(row)
     found = {}
     for it in res["items"]:
         found.update(it.get("found_links") or {})
@@ -61,11 +63,18 @@ def upsert(items):
     existing = set()
     for i in range(0, len(ids), 300):
         existing |= {r["id"] for r in SB.table("scholarships").select("id").in_("id", ids[i:i + 300]).execute().data}
-    new = [i for i in items if i["id"] not in existing]
+    new = [{k: v for k, v in i.items() if not k.startswith("_")} for i in items if i["id"] not in existing]
     now = datetime.now(timezone.utc).isoformat()
     old = [{"id": i["id"], "last_seen": now, **({"deadline": i["deadline"]} if i["deadline"] else {})} for i in items if i["id"] in existing]
     for i in range(0, len(new), 200):
         SB.table("scholarships").upsert(new[i:i + 200], on_conflict="id").execute()
+    if new:
+        try:
+            from media import enrich
+            lookup = {i["id"]: i for i in items}
+            enrich(SB, "scholarships", [{**r, "found_links": lookup[r["id"]].get("_found", {})} for r in new])
+        except Exception as e:
+            log.warning("media for new items failed: %s", e)
     for i in range(0, len(old), 200):
         SB.table("scholarships").upsert(old[i:i + 200], on_conflict="id").execute()
     return len(new)
@@ -80,6 +89,31 @@ def add_discovered(found):
     if rows:
         SB.table("sources").upsert(rows, on_conflict="name").execute()
     return len(rows)
+
+
+def fix_bad_summaries(limit=150):
+    """Rewrites summaries that are navigation junk ("Home Scholarships USA All 1,603 … Log in Sign up …")
+    by re-reading the page with the smarter extractor. Runs on a slice of rows per crawl (newest first),
+    so the whole table is cleaned over a few days without slowing the job."""
+    try:
+        rows = SB.table("scholarships").select("id,url,summary").or_(
+            'summary.ilike."Home *",summary.ilike."*Log in*",summary.ilike."*Sign up*",summary.ilike."*Contact Us*",summary.ilike."*Skip to*",summary.ilike."*Menu*",summary.ilike."*scholarships · Updated*",summary.ilike."*Read more*"' 
+        ).order("published", desc=True).limit(limit * 2).execute().data or []
+        rows = [r for r in rows if scraper.looks_like_nav(r.get("summary") or "")][:limit]
+        if not rows: return
+        def redo(r):
+            full, raw = scraper.page_fetch(r["url"])
+            return r["id"], scraper.page_summary(raw)
+        fixed = 0
+        with ThreadPoolExecutor(6) as ex:
+            for rid, summ in ex.map(redo, rows):
+                if summ:
+                    SB.table("scholarships").update({"summary": summ}).eq("id", rid).execute(); fixed += 1
+                else:  # page gives nothing usable – show a neutral line instead of menu text
+                    SB.table("scholarships").update({"summary": "Open the official listing for eligibility, benefits and how to apply."}).eq("id", rid).execute(); fixed += 1
+        log.info("summaries cleaned: %d of %d candidates", fixed, len(rows))
+    except Exception as e:
+        log.warning("summary cleanup failed: %s", e)
 
 
 def main():
@@ -124,18 +158,19 @@ def main():
         SB.rpc("purge_expired").execute()
     except Exception as e:
         log.warning("purge failed: %s", e)
+    fix_bad_summaries()
+    try:
+        from media import backfill
+        backfill(SB, "scholarships", limit=int(os.environ.get("MEDIA_BACKFILL", "150")))
+    except Exception as e:
+        log.warning("media backfill failed: %s", e)
     total = SB.table("scholarships").select("id", count="exact").limit(1).execute().count
     SB.table("runs").update({"finished": datetime.now(timezone.utc).isoformat(), "new_items": new_total,
                              "total_items": total, "notes": "; ".join(errors)[:2000]}).eq("id", run["id"]).execute()
     log.info("DONE: %d new, %d total, %d new sources discovered, %d source errors, %.0fs",
              new_total, total, discovered, len(errors), (datetime.now(timezone.utc) - started).total_seconds())
 
-    # push notification to app users (Firebase topics) + optional email/telegram alerts
-    try:
-        from push import send_daily
-        send_daily(SB)
-    except Exception as e:
-        log.warning("push failed: %s", e)
+    # push notifications are sent by crawler/notify.py (5 daily slots) – not after the crawl any more
     if all_new and (os.environ.get("SMTP_HOST") or os.environ.get("TELEGRAM_BOT_TOKEN")):
         try:
             from crawler.alerts import dispatch
