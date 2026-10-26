@@ -109,6 +109,7 @@ async function openById(id) {
   if (!id) return;
   let i = state.items.find((x) => x.id === id) || savedItems[id];
   if (!i) { try { i = (await api("/scholarships?select=id,title,url,source,summary,published,deadline,countries,regions,levels,fields,funding,tier,image,logo,org&id=eq." + encodeURIComponent(id))).items[0]; } catch (e) {} }
+  if (i && i._sec) return openNewsDetail(i);
   if (i) openDetail(i); else alert("This scholarship is no longer listed.");
 }
 function idFromUrl(u) { try { return new URL(u).searchParams.get("s"); } catch (e) { return null; } }
@@ -356,42 +357,49 @@ function spreadEmployers(items) { // in-place: when two neighbours share an empl
     if (j > k) { const [x] = items.splice(j, 1); items.splice(k, 0, x); }
   }
 }
+const SEC_LABEL = { news: "🏫 School News", tech: "💻 Tech", jobs: "💼 Job" };
+const STAR_INLINE = 'style="position:static;padding:0 8px;font-size:18px;line-height:1;flex:none"';
+function newsCardHtml(i, sec, isNew) { // one card for School News / Tech Updates / Jobs (also used inside Saved)
+  const t = NEWS_TABS[sec] || NEWS_TABS.news;
+  const pill = KIND_PILL[i.kind] ? `<span class="ntype ${KIND_PILL[i.kind][1]}">${KIND_PILL[i.kind][0]}</span>` : i.tier === "official" ? '<span class="ntype off">Official</span>' : "";
+  const inSaved = state.tab === "saved";
+  return `<div class="ncard${pill ? " has-pill" : ""}${hasMedia(i) ? " has-img" : ""}" data-id="${esc(i.id)}">${mediaHtml(i)}${pill}
+      <h3>${isNew ? '<span class="ndot"></span>' : ""}${esc(i.title)}</h3>${sec === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">🟢 Open — apply now</div>') : ""}<p>${i.summary ? esc(i.summary) : "Tap to read the full update on " + esc(i.source) + "."}</p>
+      <div class="nmeta"><span class="src">${inSaved ? SEC_LABEL[sec] + " · " : ""}${whoLine(i)}via ${esc(i.source)} · ${ago(i.published)}</span><button class="star ${saved.has(i.id) ? "on" : ""}" data-star="${esc(i.id)}" ${STAR_INLINE}>★</button><span class="go">${t.open || "Read on site ↗"}</span></div>
+    </div>`;
+}
 function renderNews() {
   const list = $("#list"), t = NEWS_TABS[state.tab];
   $("#stats").textContent = `${state.total.toLocaleString()} updates · ${t.label}${state.q ? " · “" + state.q + "”" : ""}`;
   if (!state.items.length) { list.innerHTML = `<div class="empty">${state.q ? "No updates match your search." : "No updates yet — pull down to refresh."}</div>`; $("#more").classList.add("hidden"); return; }
   const since = seenAt[state.tab] || 0;
   if (state.tab === "jobs") spreadEmployers(state.items); // never the same employer twice in a row
-  list.innerHTML = state.items.map((i, idx) => {
-    const pill = KIND_PILL[i.kind] ? `<span class="ntype ${KIND_PILL[i.kind][1]}">${KIND_PILL[i.kind][0]}</span>` : i.tier === "official" ? '<span class="ntype off">Official</span>' : "";
-    const isNew = new Date(i.published).getTime() > since;
-    return `${idx > 0 && idx % 4 === 0 ? (isNative ? nativeSlot(i) : '<div class="ad-card">Advertisement</div>') : ""}
-    <div class="ncard${pill ? " has-pill" : ""}${hasMedia(i) ? " has-img" : ""}" data-id="${esc(i.id)}">${mediaHtml(i)}${pill}
-      <h3>${isNew ? '<span class="ndot"></span>' : ""}${esc(i.title)}</h3>${state.tab === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">🟢 Open — apply now</div>') : ""}<p>${i.summary ? esc(i.summary) : "Tap to read the full update on " + esc(i.source) + "."}</p>
-      <div class="nmeta"><span class="src">${whoLine(i)}via ${esc(i.source)} · ${ago(i.published)}</span><span class="go">${t.open || "Read on site ↗"}</span></div>
-    </div>`; }).join("");
+  list.innerHTML = state.items.map((i, idx) => `${idx > 0 && idx % 4 === 0 ? (isNative ? nativeSlot(i) : '<div class="ad-card">Advertisement</div>') : ""}${newsCardHtml(i, state.tab, new Date(i.published).getTime() > since)}`).join("");
   $("#more").classList.toggle("hidden", state.offset >= state.total);
 }
 function openNewsDetail(i) {
+  const sec = i._sec || state.tab; // section the item belongs to (works from Saved too)
   maybeInterstitial(); // deliberate open = natural break point (same rule as scholarship cards)
   const pill = KIND_PILL[i.kind] ? `<span class="ntype ${KIND_PILL[i.kind][1]}" style="position:static;margin-left:8px">${KIND_PILL[i.kind][0]}</span>` : i.tier === "official" ? '<span class="ntype off" style="position:static;margin-left:8px">Official</span>' : "";
   const host = (() => { try { return new URL(i.url).hostname.replace(/^www\./, ""); } catch (e) { return ""; } })();
   $("#detailBody").innerHTML = `<div class="detail">${mediaHtml(i, true)}
     <h2>${esc(i.title)}</h2>
     <div class="muted" style="margin:4px 0 10px">${whoLine(i)}via ${esc(i.source)} · ${ago(i.published)}${pill}</div>
-    ${state.tab === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">🟢 Open — apply now (no closing date stated)</div>') : ""}
-    <p>${esc(i.summary || (state.tab === "jobs" ? "Open the listing for the full description and how to apply." : "Open the full article to read more."))}</p>
-    <div class="muted" style="margin-top:6px;font-size:12px">${state.tab === "jobs" ? "ℹ️ Independent app – we list jobs from public job boards and never charge for applications. Beware of anyone asking for money to process a job. Apply only on the employer's or job board's page below." : `ℹ️ Summary collected automatically from ${esc(host || i.source)}. Read the full article on the source website.`}</div>
+    ${sec === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">🟢 Open — apply now (no closing date stated)</div>') : ""}
+    <p>${esc(i.summary || (sec === "jobs" ? "Open the listing for the full description and how to apply." : "Open the full article to read more."))}</p>
+    <div class="muted" style="margin-top:6px;font-size:12px">${sec === "jobs" ? "ℹ️ Independent app – we list jobs from public job boards and never charge for applications. Beware of anyone asking for money to process a job. Apply only on the employer's or job board's page below." : `ℹ️ Summary collected automatically from ${esc(host || i.source)}. Read the full article on the source website.`}</div>
     <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#0369a1">${esc(i.url)}</a></div>
     <div class="actions">
+      <button class="ghost" id="nSave">${saved.has(i.id) ? "★ Saved" : "☆ Save"}</button>
       <button class="ghost" id="nShare">Share</button>
-      <button id="nOpen">${NEWS_TABS[state.tab].open || "Read full article ↗"}</button>
+      <button id="nOpen">${NEWS_TABS[sec].open || "Read full article ↗"}</button>
     </div></div>`;
   $("#detail").classList.remove("hidden");
   $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
   $("#nOpen").onclick = () => openUrl(i.url);
+  $("#nSave").onclick = () => { i._sec = sec; toggleSave(i); $("#nSave").textContent = saved.has(i.id) ? "★ Saved" : "☆ Save"; };
   $("#nShare").onclick = async () => {
-    const text = (state.tab === "news" ? "🏫 " : state.tab === "jobs" ? "💼 " : "💻 ") + i.title + (i.school ? "\n" + i.school : i.company ? "\n" + i.company + (i.location ? " · " + i.location : "") : "") + (state.tab === "jobs" && i.deadline ? "\n⏰ Closes " + i.deadline : "") + "\n\n📲 Get ScholarHub free on Google Play – scholarships, school news, tech updates & jobs:\n" + PLAY_URL;
+    const text = (sec === "news" ? "🏫 " : sec === "jobs" ? "💼 " : "💻 ") + i.title + (i.school ? "\n" + i.school : i.company ? "\n" + i.company + (i.location ? " · " + i.location : "") : "") + (sec === "jobs" && i.deadline ? "\n⏰ Closes " + i.deadline : "") + "\n\n📲 Get ScholarHub free on Google Play – scholarships, school news, tech updates & jobs:\n" + PLAY_URL;
     try { if (Share && Share.share) return await Share.share({ title: i.title, text, dialogTitle: "Share" }); } catch (e) {}
     try { if (navigator.share) return await navigator.share({ title: i.title, text }); } catch (e) {}
     try { await navigator.clipboard.writeText(text); alert("Copied"); } catch (e) { prompt("Copy", text); }
@@ -507,10 +515,10 @@ const logoHtml = (u) => `<div class="nlogo"><img src="${esc(u)}" alt="" loading=
 const hasMedia = (i) => !!(i.image || i.logo);
 function render() {
   const list = $("#list");
-  if (!state.items.length) { list.innerHTML = '<div class="empty">No opportunities match. Try clearing filters.</div>'; $("#more").classList.add("hidden"); return; }
+  if (!state.items.length) { list.innerHTML = `<div class="empty">${state.tab === "saved" ? "Nothing saved yet — tap ★ on any scholarship, job or update to keep it here." : "No opportunities match. Try clearing filters."}</div>`; $("#more").classList.add("hidden"); return; }
   list.innerHTML = state.items.map((i, idx) => `
     ${idx > 0 && idx % 4 === 0 ? (isNative ? nativeSlot(i) : '<div class="ad-card">Advertisement</div>') : ""}
-    <div class="card${hasMedia(i) ? " has-img" : ""}" data-id="${esc(i.id)}">
+    ${i._sec ? newsCardHtml(i, i._sec, false) : `<div class="card${hasMedia(i) ? " has-img" : ""}" data-id="${esc(i.id)}">
       ${mediaHtml(i)}
       <button class="star ${saved.has(i.id) ? "on" : ""}" data-star="${esc(i.id)}">★</button>
       <h3>${esc(i.title)}</h3>
@@ -518,7 +526,7 @@ function render() {
       <p>${esc(i.summary)}</p>
       ${tags(i)}
       <div class="meta">via ${esc(i.source)} · ${esc((i.published || "").slice(0, 10))}</div>
-    </div>`).join("");
+    </div>`}`).join("");
   $("#more").classList.toggle("hidden", state.tab === "saved" || state.offset >= state.total);
   $("#stats").textContent = `${state.total.toLocaleString()} ${state.newOnly ? "new " : ""}opportunities${state.region ? " · " + state.region : ""}${state.added ? ` · added in last ${state.added === 1 ? "24h" : state.added + " days"}` : ""}${state.dlFrom || state.dlTo ? ` · deadline ${state.dlFrom || "…"} → ${state.dlTo || "…"}` : ""}${state.newOnly ? " · tap ↻ for all" : ""}`;
   api("/app_stats?select=last_run").then((r) => { const t = r.items[0] && r.items[0].last_run; if (t) $("#stats").textContent += ` · updated ${new Date(t).toLocaleString([], { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`; }).catch(() => {});
@@ -610,6 +618,7 @@ function openDetail(i) {
 }
 function planCount(sid) { const n = plan.filter((t) => t.sid === sid && !t.done).length; return n ? `${n} open task${n > 1 ? "s" : ""} in plan` : ""; }
 function toggleSave(i) {
+  if (!i._sec && NEWS_TABS[state.tab]) i._sec = state.tab; // news / tech / jobs item → remember its section for the Saved tab
   if (saved.has(i.id)) { saved.delete(i.id); delete savedItems[i.id]; } else { saved.add(i.id); savedItems[i.id] = i; }
   localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems));
   document.querySelectorAll(`[data-star="${i.id}"]`).forEach((b) => b.classList.toggle("on", saved.has(i.id)));
@@ -620,6 +629,8 @@ function toggleSave(i) {
 $("#ann").addEventListener("click", (e) => { const b = e.target.closest("[data-ann-link]"); if (b) openUrl(b.dataset.annLink); });
 $("#list").addEventListener("click", (e) => {
   if (e.target.closest("[data-boost]")) { nextBoost(); return; }
+  const star0 = e.target.closest("[data-star]");
+  if (star0) { const i = state.items.find((x) => x.id === star0.dataset.star); if (i) toggleSave(i); return; }
   const nc = e.target.closest(".ncard"); if (nc) { const i = state.items.find((x) => x.id === nc.dataset.id); if (i) openNewsDetail(i); return; }
   const dn = e.target.closest("[data-done]");
   if (dn) { const t = plan.find((x) => x.id === dn.dataset.done); if (t) { t.done = dn.checked; savePlan(); setTimeout(renderPlan, 250); } return; }
