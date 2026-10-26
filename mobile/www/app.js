@@ -39,6 +39,7 @@ async function cardImage(i) {
   try { return drawCard(i, photo, logo); } catch (e) { return drawCard(i, null, null); } // picture host without CORS → card without picture
 }
 function drawCard(i, photo, logo) {
+  const sec = i._sec || ""; const isJob = sec === "jobs", isNews = sec === "news" || sec === "tech";
   const W = 1080, P = 56, c = document.createElement("canvas"), x = c.getContext("2d");
   const font = (px, w = 400) => (x.font = `${w} ${px}px system-ui, Roboto, "Noto Color Emoji", sans-serif`);
   const wrap = (txt, px, w, maxW, maxLines) => { font(px, w); const out = []; let line = ""; for (const word of String(txt || "").split(/\s+/)) { const t = line ? line + " " + word : word; if (x.measureText(t).width > maxW && line) { out.push(line); line = word; if (out.length === maxLines) break; } else line = t; } if (out.length < maxLines && line) out.push(line); if (out.length === maxLines && x.measureText(out[maxLines - 1]).width > maxW - 30) out[maxLines - 1] = out[maxLines - 1].replace(/\s?\S*$/, "") + "…"; return out; };
@@ -46,9 +47,10 @@ function drawCard(i, photo, logo) {
   // measure first
   const titleLines = wrap(i.title, 50, 800, W - 2 * P, 4);
   const sumLines = wrap(i.summary, 32, 400, W - 2 * P, 4);
-  const tagList = [i.tier === "official" ? "🏛 official" : "", i.funding, ...(i.levels || "").split(", ").filter(Boolean).slice(0, 2), ...(i.countries || "").split(", ").filter(Boolean).slice(0, 2)].filter(Boolean);
-  let days = null, dlTxt = "🟢 Open — apply now (no deadline stated)", dlCol = "#34d399";
-  if (i.deadline) { days = Math.round((new Date(i.deadline) - new Date().setHours(0, 0, 0, 0)) / 864e5); dlTxt = `⏰ Deadline ${i.deadline} (${days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left"})`; dlCol = days < 0 ? "#f87171" : days <= 14 ? "#fbbf24" : "#34d399"; }
+  const kindTxt = (KIND_PILL[i.kind] || [])[0];
+  const tagList = sec ? [kindTxt, i.company, i.location, i.school].filter(Boolean) : [i.tier === "official" ? "🏛 official" : "", i.funding, ...(i.levels || "").split(", ").filter(Boolean).slice(0, 2), ...(i.countries || "").split(", ").filter(Boolean).slice(0, 2)].filter(Boolean);
+  let days = null, dlTxt = isNews ? "" : isJob ? "🟢 Open — apply now" : "🟢 Open — apply now (no deadline stated)", dlCol = "#34d399";
+  if (i.deadline) { days = Math.round((new Date(i.deadline) - new Date().setHours(0, 0, 0, 0)) / 864e5); dlTxt = `⏰ ${isJob ? "Closes" : "Deadline"} ${i.deadline} (${days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left"})`; dlCol = days < 0 ? "#f87171" : days <= 14 ? "#fbbf24" : "#34d399"; }
   const imgH = photo ? 460 : logo ? 240 : 0;
   const H = 150 + imgH + titleLines.length * 62 + 60 + sumLines.length * 44 + (tagList.length ? 80 : 20) + 60 + 232 + 150;
   c.width = W; c.height = H;
@@ -65,7 +67,7 @@ function drawCard(i, photo, logo) {
     x.restore();
   }
   let y = cy + imgH + 80; font(50, 800); x.fillStyle = "#f1f5f9"; for (const l of titleLines) { x.fillText(l, P + 10, y); y += 62; }
-  y += 6; font(30, 700); x.fillStyle = dlCol; x.fillText(dlTxt, P + 10, y); y += 54;
+  if (dlTxt) { y += 6; font(30, 700); x.fillStyle = dlCol; x.fillText(dlTxt, P + 10, y); y += 54; } else y += 10;
   font(32, 400); x.fillStyle = "#94a3b8"; for (const l of sumLines) { x.fillText(l, P + 10, y); y += 44; }
   if (tagList.length) { y += 12; let tx = P + 10; font(26, 600); for (const t of tagList) { const w = x.measureText(t).width + 36; if (tx + w > W - P) break; rr(tx, y - 30, w, 46, 23, "#0f172a", "#334155"); x.fillStyle = t === i.funding ? "#34d399" : t.startsWith("🏛") ? "#c084fc" : "#94a3b8"; x.fillText(t, tx + 18, y + 2); tx += w + 12; } y += 60; }
   font(26, 400); x.fillStyle = "#64748b"; x.fillText(`via ${i.source || ""}`, P + 10, y + 10);
@@ -74,7 +76,7 @@ function drawCard(i, photo, logo) {
   // action buttons, exactly like the detail screen (shows the tracking features)
   const btn = (X, Y, w, label, filled) => { rr(X, Y, w, 64, 16, filled ? "#38bdf8" : "#0f172a", filled ? null : "#334155"); font(26, 700); x.fillStyle = filled ? "#0f172a" : filled === false ? "#94a3b8" : "#94a3b8"; x.textAlign = "center"; x.fillText(label, X + w / 2, Y + 41); x.textAlign = "left"; };
   const bx = P + 10, bw = W - 2 * P - 20, g = 14; y += 90;
-  const w3 = (bw - 2 * g) / 3; btn(bx, y, w3, "☆ Save", false); btn(bx + w3 + g, y, w3, "Share", false); btn(bx + 2 * (w3 + g), y, w3, "Apply / Details ↗", true);
+  const w3 = (bw - 2 * g) / 3; btn(bx, y, w3, "☆ Save", false); btn(bx + w3 + g, y, w3, "Share", false); btn(bx + 2 * (w3 + g), y, w3, isJob ? "Apply on site ↗" : isNews ? "Read on site ↗" : "Apply / Details ↗", true);
   y += 64 + g; const w2 = (bw - g) / 2; btn(bx, y, w2, "＋ Add to plan", false); btn(bx + w2 + g, y, w2, "📝 Add to opportunity note", false);
   // footer: Play Store call-to-action
   const fy = H - 100; rr(P, fy, W - 2 * P, 70, 18, "#38bdf8"); font(30, 800); x.fillStyle = "#0f172a"; x.textAlign = "center"; const lbl = "Get ScholarHub free on Google Play"; const lw = x.measureText(lbl).width; x.fillText(lbl, W / 2 + 22, fy + 46); x.textAlign = "left";
@@ -82,27 +84,40 @@ function drawCard(i, photo, logo) {
   const ax = W / 2 - lw / 2 - 20, ay = fy + 35; x.fillStyle = "#0f172a"; x.fillRect(ax - 6, ay - 20, 12, 24); x.beginPath(); x.moveTo(ax - 16, ay + 2); x.lineTo(ax + 16, ay + 2); x.lineTo(ax, ay + 20); x.closePath(); x.fill();
   return c.toDataURL("image/png");
 }
+function shareText(i) {
+  const sec = i._sec || "";
+  const who = i.school ? "\n" + i.school : i.company ? "\n" + i.company + (i.location ? " · " + i.location : "") : "";
+  const when = i.deadline ? "\n⏰ " + (sec === "jobs" ? "Closes " : "Deadline: ") + i.deadline : "";
+  const tail = sec ? "\n\n📲 Get ScholarHub free on Google Play – scholarships, school news, tech updates & jobs:\n" : "\n\n📲 Get ScholarHub free on Google Play – scholarships worldwide, updated twice a day:\n";
+  return (sec === "news" ? "🏫 " : sec === "tech" ? "💻 " : sec === "jobs" ? "💼 " : "🎓 ") + i.title + who + when + tail + PLAY_URL;
+}
+let shareBusy = false;
 async function shareItem(i) {
-  const text = "🎓 " + i.title + (i.deadline ? "\n⏰ Deadline: " + i.deadline : "") + "\n\n📲 Get ScholarHub free on Google Play – scholarships worldwide, updated twice a day:\n" + PLAY_URL;
-  // 1) native: save the card image to cache and share image + text
+  if (shareBusy) return; shareBusy = true;
+  const text = shareText(i), title = i.title, dialogTitle = "Share";
   try {
+    let imgErr = "";
+    // 1) native: draw the card, save it to the app cache and hand image + text to the share sheet (WhatsApp chats AND Status accept this)
     if (Share && Share.share && FS && FS.writeFile) {
-      const data = (await cardImage(i)).split(",")[1];
-      const f = await FS.writeFile({ path: "share-" + Date.now() + ".png", data, directory: "CACHE" });
-      return await Share.share({ title: i.title, text, files: [f.uri], dialogTitle: "Share scholarship" });
+      try {
+        const data = (await cardImage(i)).split(",")[1];
+        const f = await FS.writeFile({ path: "share-" + Date.now() + ".png", data, directory: "CACHE" });
+        await Share.share({ title, text, files: [f.uri], dialogTitle }); return;
+      } catch (e) { imgErr = (e && (e.message || e.code || String(e))) || "unknown"; if (/cancel/i.test(imgErr)) return; console.warn("image share failed", e); }
     }
-  } catch (e) { console.warn("image share failed", e); }
-  // 2) web: share the image file if the browser supports it
-  try {
-    if (navigator.share && navigator.canShare) {
-      const blob = await (await fetch(await cardImage(i))).blob(); const file = new File([blob], "scholarhub.png", { type: "image/png" });
-      if (navigator.canShare({ files: [file] })) return await navigator.share({ title: i.title, text, files: [file] });
-    }
-  } catch (e) {}
-  // 3) fallbacks: text only
-  try { if (Share && Share.share) return await Share.share({ title: i.title, text, dialogTitle: "Share scholarship" }); } catch (e) {}
-  try { if (navigator.share) return await navigator.share({ title: i.title, text }); } catch (e) {}
-  try { await navigator.clipboard.writeText(text); alert("Copied"); } catch (e) { prompt("Copy", text); }
+    // 2) web: share the image file if the browser supports it
+    try {
+      if (navigator.share && navigator.canShare) {
+        const blob = await (await fetch(await cardImage(i))).blob(); const file = new File([blob], "scholarhub.png", { type: "image/png" });
+        if (navigator.canShare({ files: [file] })) { await navigator.share({ title, text, files: [file] }); return; }
+      }
+    } catch (e) { if (/abort/i.test(String(e))) return; }
+    // 3) fallbacks: text only – and say why, so the problem can be reported
+    if (imgErr) showToast("ℹ️ Shared as text", "Card picture could not be attached: " + imgErr.slice(0, 120));
+    try { if (Share && Share.share) return await Share.share({ title, text, dialogTitle }); } catch (e) {}
+    try { if (navigator.share) return await navigator.share({ title, text }); } catch (e) {}
+    try { await navigator.clipboard.writeText(text); alert("Copied"); } catch (e) { prompt("Copy", text); }
+  } finally { shareBusy = false; }
 }
 // Deep link: open a specific scholarship by id (from a shared link)
 async function openById(id) {
@@ -402,12 +417,7 @@ function openNewsDetail(i) {
   $("#nOpen").onclick = () => openUrl(i.url);
   $("#nSave").onclick = () => { i._sec = sec; toggleSave(i); $("#nSave").textContent = saved.has(i.id) ? "★ Saved" : "☆ Save"; };
   i._sec = sec; attachNoteBox(i, "#nSave");
-  $("#nShare").onclick = async () => {
-    const text = (sec === "news" ? "🏫 " : sec === "jobs" ? "💼 " : "💻 ") + i.title + (i.school ? "\n" + i.school : i.company ? "\n" + i.company + (i.location ? " · " + i.location : "") : "") + (sec === "jobs" && i.deadline ? "\n⏰ Closes " + i.deadline : "") + "\n\n📲 Get ScholarHub free on Google Play – scholarships, school news, tech updates & jobs:\n" + PLAY_URL;
-    try { if (Share && Share.share) return await Share.share({ title: i.title, text, dialogTitle: "Share" }); } catch (e) {}
-    try { if (navigator.share) return await navigator.share({ title: i.title, text }); } catch (e) {}
-    try { await navigator.clipboard.writeText(text); alert("Copied"); } catch (e) { prompt("Copy", text); }
-  };
+  $("#nShare").onclick = () => shareItem(i);
 }
 function setMode() {
   document.body.classList.toggle("mode-news", isNewsTab());
@@ -420,18 +430,38 @@ function setMode() {
 async function loadAnnouncement() {
   const box = $("#ann"); if (!box) return;
   try {
-    const r = await api("/announcements?select=id,title,body,link_url,link_text&order=created_at.desc&limit=1");
-    const a = r.items[0];
-    if (!a) { box.classList.add("hidden"); box.innerHTML = ""; localStorage.removeItem("ann"); return; }
-    localStorage.setItem("ann", JSON.stringify(a)); showAnnouncement(a);
-  } catch (e) { const c = JSON.parse(localStorage.getItem("ann") || "null"); if (c) showAnnouncement(c); } // offline: keep the last one seen
+    const r = await api("/announcements?select=id,title,body,link_url,link_text&order=created_at.desc&limit=4");
+    if (!r.items.length) { box.classList.add("hidden"); box.innerHTML = ""; annStop(); localStorage.removeItem("ann"); return; }
+    localStorage.setItem("ann", JSON.stringify(r.items)); showAnnouncement(r.items);
+  } catch (e) { const c = JSON.parse(localStorage.getItem("ann") || "null"); if (c) showAnnouncement(Array.isArray(c) ? c : [c]); } // offline: keep the last ones seen
 }
-function showAnnouncement(a) {
-  const box = $("#ann");
-  const link = a.link_url && /^https?:\/\//i.test(a.link_url) ? `<div><button data-ann-link="${esc(a.link_url)}">${esc(a.link_text || "Open link →")}</button></div>` : "";
-  box.innerHTML = `<div class="ann-tag">📣 Announcement</div>${a.title ? `<b>${esc(a.title)}</b>` : ""}${a.body ? `<p>${esc(a.body)}</p>` : ""}${link}`;
-  box.classList.remove("hidden");
+// Up to 4 announcements in one banner: auto-advance every 5 s (pauses while touched / in background), swipe to move, dots show position.
+let annIdx = 0, annTimer = null, annN = 0;
+function annStop() { clearTimeout(annTimer); annTimer = null; const b = $("#ann .ann-bar"); if (b) b.classList.remove("run"); }
+function annGo(k) {
+  const track = $("#ann .ann-track"); if (!track || !annN) return;
+  annIdx = ((k % annN) + annN) % annN; track.style.transition = ""; track.style.transform = `translateX(-${annIdx * 100}%)`;
+  document.querySelectorAll("#ann .ann-dots i").forEach((d, j) => d.classList.toggle("on", j === annIdx));
+  annStop(); if (annN < 2 || document.hidden) return;
+  const b = $("#ann .ann-bar"); if (b) { void b.offsetWidth; b.classList.add("run"); }
+  annTimer = setTimeout(() => annGo(annIdx + 1), 5000);
 }
+function showAnnouncement(list) {
+  const box = $("#ann"); annN = list.length; annIdx = 0;
+  const slide = (a, k) => { const link = a.link_url && /^https?:\/\//i.test(a.link_url) ? `<div><button data-ann-link="${esc(a.link_url)}">${esc(a.link_text || "Open link →")}</button></div>` : "";
+    return `<div class="ann-slide"><div class="ann-tag"><span>📣 Announcement</span>${annN > 1 ? `<small>${k + 1}/${annN}</small>` : ""}</div>${a.title ? `<b>${esc(a.title)}</b>` : ""}${a.body ? `<p>${esc(a.body)}</p>` : ""}${link}</div>`; };
+  box.innerHTML = `<div class="ann-track">${list.map(slide).join("")}</div>${annN > 1 ? `<div class="ann-dots">${list.map((_, k) => `<i class="${k ? "" : "on"}"></i>`).join("")}</div><div class="ann-bar"></div>` : ""}`;
+  box.classList.toggle("multi", annN > 1); box.classList.remove("hidden");
+  annGo(0);
+}
+(() => { // swipe handling for the announcement banner (set up once)
+  const box = document.getElementById("ann"); if (!box) return;
+  let sx = 0, dx = 0, on = false;
+  box.addEventListener("touchstart", (e) => { if (annN < 2) return; sx = e.touches[0].clientX; dx = 0; on = true; annStop(); const t = $("#ann .ann-track"); if (t) t.style.transition = "none"; }, { passive: true });
+  box.addEventListener("touchmove", (e) => { if (!on) return; dx = e.touches[0].clientX - sx; const t = $("#ann .ann-track"); if (t) t.style.transform = `translateX(calc(-${annIdx * 100}% + ${dx}px))`; }, { passive: true });
+  box.addEventListener("touchend", () => { if (!on) return; on = false; annGo(annIdx + (Math.abs(dx) > 40 ? (dx < 0 ? 1 : -1) : 0)); }, { passive: true });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) annStop(); else if (annN > 1 && !$("#ann").classList.contains("hidden")) annGo(annIdx); });
+})();
 function setOffline(on) {
   let b = $(".offline");
   if (on && !b) { b = document.createElement("div"); b.className = "offline"; b.textContent = "Offline – showing saved results"; $("#top").after(b); }
@@ -488,6 +518,13 @@ function showBoostToast() {
   let sx = 0; t.addEventListener("touchstart", (e) => (sx = e.touches[0].clientX), { passive: true });
   t.addEventListener("touchend", (e) => { if (Math.abs(e.changedTouches[0].clientX - sx) > 60) hideBoostToast(); }, { passive: true });
   toastTimer = setTimeout(hideBoostToast, 8000);
+}
+function showToast(tag, msg, ms = 7000) {
+  hideBoostToast();
+  const t = document.createElement("div"); t.className = "toast"; t.id = "toast";
+  t.innerHTML = `<div class="toast-tag">${esc(tag)}</div><div class="toast-q" style="font-style:normal">${esc(msg)}</div><button class="toast-x" aria-label="Dismiss">✕</button>`;
+  document.body.appendChild(t); requestAnimationFrame(() => t.classList.add("in"));
+  t.querySelector(".toast-x").onclick = hideBoostToast; toastTimer = setTimeout(hideBoostToast, ms);
 }
 function hideBoostToast() { clearTimeout(toastTimer); const t = $("#toast"); if (t) { t.classList.remove("in"); setTimeout(() => t.remove(), 300); } }
 
