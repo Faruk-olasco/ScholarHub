@@ -29,3 +29,4 @@ jobs:
           python crawler/pull.py          # links queued from the app's admin screen
           python crawler/run.py
           python crawler/news.py || true  # School News (Nigerian universities) + Tech Updates – separate tables, never blocks the scholarship crawl
+          python crawler/jobs.py || true  # Jobs (entry-level / graduate / internship / NGO / remote) – own table
