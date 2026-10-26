@@ -417,6 +417,9 @@ def harvest_html(html_text, base_url, source_name, known_urls=(), detail_limit=6
         if body and looks_like_nav(body[:600]): body = page_summary(page_fetch(href)[1]) or ""
         entry = {"title": text, "link": href, "summary": body or f"Official listing from {source_name} ({host}). Open the link for eligibility, benefits and deadline."}
         it = normalise(entry, source_name)
+        if it and not it.get("deadline"):   # undated page link whose title only names past years ("Scholarship 2024/2025") = archive, not a live call
+            years = [int(y) for y in re.findall(r"\b(20[12]\d)\b", text + " " + href)]
+            if years and max(years) < datetime.now(timezone.utc).year: continue
         if it:
             it["tier"] = "official"
             if body and ONGOING_RE.search(body): it["deadline_note"] = "rolling"
