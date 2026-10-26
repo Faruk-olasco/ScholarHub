@@ -358,14 +358,16 @@ function spreadEmployers(items) { // in-place: when two neighbours share an empl
   }
 }
 const SEC_LABEL = { news: "🏫 School News", tech: "💻 Tech", jobs: "💼 Job" };
-const STAR_INLINE = 'style="position:static;padding:0 8px;font-size:18px;line-height:1;flex:none"';
+const STAR_IMG = 'style="background:rgba(255,255,255,.88);border-radius:50%;width:34px;height:34px;line-height:26px;text-align:center;color:#475569;top:8px;right:8px"'; // over a picture: white circle like scholarship cards
 function newsCardHtml(i, sec, isNew) { // one card for School News / Tech Updates / Jobs (also used inside Saved)
   const t = NEWS_TABS[sec] || NEWS_TABS.news;
-  const pill = KIND_PILL[i.kind] ? `<span class="ntype ${KIND_PILL[i.kind][1]}">${KIND_PILL[i.kind][0]}</span>` : i.tier === "official" ? '<span class="ntype off">Official</span>' : "";
+  const img = hasMedia(i), pr = img ? 'style="right:50px"' : 'style="right:44px"'; // make room for the ★ at the top-right
+  const pill = KIND_PILL[i.kind] ? `<span class="ntype ${KIND_PILL[i.kind][1]}" ${pr}>${KIND_PILL[i.kind][0]}</span>` : i.tier === "official" ? `<span class="ntype off" ${pr}>Official</span>` : "";
   const inSaved = state.tab === "saved";
-  return `<div class="ncard${pill ? " has-pill" : ""}${hasMedia(i) ? " has-img" : ""}" data-id="${esc(i.id)}">${mediaHtml(i)}${pill}
-      <h3>${isNew ? '<span class="ndot"></span>' : ""}${esc(i.title)}</h3>${sec === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">🟢 Open — apply now</div>') : ""}<p>${i.summary ? esc(i.summary) : "Tap to read the full update on " + esc(i.source) + "."}</p>
-      <div class="nmeta"><span class="src">${inSaved ? SEC_LABEL[sec] + " · " : ""}${whoLine(i)}via ${esc(i.source)} · ${ago(i.published)}</span><button class="star ${saved.has(i.id) ? "on" : ""}" data-star="${esc(i.id)}" ${STAR_INLINE}>★</button><span class="go">${t.open || "Read on site ↗"}</span></div>
+  const star = `<button class="star ${saved.has(i.id) ? "on" : ""}" data-star="${esc(i.id)}" ${img ? STAR_IMG : ""}>★</button>`;
+  return `<div class="ncard${pill ? " has-pill" : ""}${img ? " has-img" : ""}" data-id="${esc(i.id)}">${mediaHtml(i)}${pill}${star}
+      <h3${img ? "" : pill ? ' style="padding-right:140px"' : ' style="padding-right:36px"'}>${isNew ? '<span class="ndot"></span>' : ""}${esc(i.title)}</h3>${sec === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">🟢 Open — apply now</div>') : ""}<p>${i.summary ? esc(i.summary) : "Tap to read the full update on " + esc(i.source) + "."}</p>
+      <div class="nmeta"><span class="src">${inSaved ? SEC_LABEL[sec] + " · " : ""}${whoLine(i)}via ${esc(i.source)} · ${ago(i.published)}</span><span class="go">${t.open || "Read on site ↗"}</span></div>
     </div>`;
 }
 function renderNews() {
@@ -393,11 +395,13 @@ function openNewsDetail(i) {
       <button class="ghost" id="nSave">${saved.has(i.id) ? "★ Saved" : "☆ Save"}</button>
       <button class="ghost" id="nShare">Share</button>
       <button id="nOpen">${NEWS_TABS[sec].open || "Read full article ↗"}</button>
-    </div></div>`;
+    </div>
+    <div id="dNoteWrap"></div></div>`;
   $("#detail").classList.remove("hidden");
   $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
   $("#nOpen").onclick = () => openUrl(i.url);
   $("#nSave").onclick = () => { i._sec = sec; toggleSave(i); $("#nSave").textContent = saved.has(i.id) ? "★ Saved" : "☆ Save"; };
+  i._sec = sec; attachNoteBox(i, "#nSave");
   $("#nShare").onclick = async () => {
     const text = (sec === "news" ? "🏫 " : sec === "jobs" ? "💼 " : "💻 ") + i.title + (i.school ? "\n" + i.school : i.company ? "\n" + i.company + (i.location ? " · " + i.location : "") : "") + (sec === "jobs" && i.deadline ? "\n⏰ Closes " + i.deadline : "") + "\n\n📲 Get ScholarHub free on Google Play – scholarships, school news, tech updates & jobs:\n" + PLAY_URL;
     try { if (Share && Share.share) return await Share.share({ title: i.title, text, dialogTitle: "Share" }); } catch (e) {}
@@ -544,11 +548,11 @@ function renderPlan() {
   const row = (t) => `<div class="task ${t.done ? "done" : ""}" data-task="${t.id}">
       <input type="checkbox" data-done="${t.id}" ${t.done ? "checked" : ""}>
       <div class="body"><div class="txt" data-edit="${t.id}" title="Tap to edit">${esc(t.text)}</div>
-        <div class="sub">${dueTxt(t.due)}${t.sid ? `${t.due ? " · " : ""}🎓 <a href="#" data-goto="${esc(t.sid)}">${esc(t.stitle).slice(0, 60)}</a>` : ""}</div></div>
+        <div class="sub">${dueTxt(t.due)}${t.sid ? `${t.due ? " · " : ""}${savedItems[t.sid] && savedItems[t.sid]._sec ? (SEC_LABEL[savedItems[t.sid]._sec] || "").slice(0, 2) : "🎓"} <a href="#" data-goto="${esc(t.sid)}">${esc(t.stitle).slice(0, 60)}</a>` : ""}</div></div>
       <button class="del" data-edit="${t.id}" aria-label="Edit">✎</button><button class="del" data-del="${t.id}" aria-label="Delete">✕</button></div>`;
-  const noteRow = (sid) => { const it = savedItems[sid] || {}; const title = it.title || "Scholarship"; const editing = editingNote === sid; return `<div class="card" data-notecard="${esc(sid)}" style="margin-bottom:10px">
+  const noteRow = (sid) => { const it = savedItems[sid] || {}; const title = it.title || "Scholarship"; const editing = editingNote === sid; const dl = it._sec && !it.deadline ? "" : deadlineHtml(it.deadline); return `<div class="card" data-notecard="${esc(sid)}" style="margin-bottom:10px">
       <h3 style="padding-right:0"><a href="#" data-goto="${esc(sid)}">${esc(title)}</a></h3>
-      ${deadlineHtml(it.deadline)}
+      ${it._sec ? `<div class="muted" style="font-size:12px;margin:-2px 0 6px">${SEC_LABEL[it._sec] || ""}</div>` : ""}${dl}
       ${editing
         ? `<textarea data-note="${esc(sid)}" aria-label="Note" style="width:100%;min-height:90px;margin-top:10px;padding:10px;border-radius:10px;border:1px solid #cbd5e1;background:#f1f5f9;color:inherit;font-size:14px;line-height:1.45;font-family:inherit;resize:vertical;box-sizing:border-box">${esc(notes[sid])}</textarea>
            <div class="row" style="justify-content:flex-end;gap:8px;margin-top:8px"><button class="ghost" data-ncancel="${esc(sid)}">Cancel</button><button data-nsave="${esc(sid)}">Save</button></div>`
@@ -559,7 +563,7 @@ function renderPlan() {
              <a href="#" data-ndel="${esc(sid)}" style="color:var(--bad);text-decoration:none">✕ Delete</a></div>`}
     </div>`; };
   if (planView === "notes") {
-    list.innerHTML = boostHtml() + seg + (noteIds.length ? noteIds.map(noteRow).join("") : '<div class="empty">No notes yet. Open any scholarship and tap "Add to opportunity note" – it will appear here.</div>');
+    list.innerHTML = boostHtml() + seg + (noteIds.length ? noteIds.map(noteRow).join("") : '<div class="empty">No notes yet. Open any scholarship, job or update and tap "Add to opportunity note" – it will appear here.</div>');
   } else {
     list.innerHTML = boostHtml() + seg + `<div class="plan-add">
       <textarea id="tText" placeholder="What are you working on? e.g. Request transcript for DAAD application, write motivation letter…"></textarea>
@@ -596,6 +600,9 @@ function openDetail(i) {
   $("#dOpen").onclick = () => openUrl(i.url);
   $("#dShare").onclick = () => shareItem(i);
   $("#dSave").onclick = () => { toggleSave(i); $("#dSave").textContent = saved.has(i.id) ? "★ Saved" : "☆ Save"; };
+  attachNoteBox(i, "#dSave");
+}
+function attachNoteBox(i, saveSel) { // "Add to plan" + personal note, shared by scholarship and job/news sheets
   const renderNoteBox = (editing) => {
     const cur = notes[i.id] || "";
     $("#dNoteWrap").innerHTML = editing
@@ -608,7 +615,7 @@ function openDetail(i) {
     if (editing) {
       $("#dNote").focus();
       $("#dNoteCancel").onclick = () => renderNoteBox(false);
-      $("#dNoteSave").onclick = () => { const v = $("#dNote").value.trim(); if (v) { notes[i.id] = v; if (!savedItems[i.id]) { savedItems[i.id] = i; saved.add(i.id); localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems)); $("#dSave").textContent = "★ Saved"; } } else delete notes[i.id]; savePlan(); renderNoteBox(false); $("#dNoteSaved").textContent = v ? "Note saved ✓ — see Plan → Opportunity notes" : planCount(i.id); };
+      $("#dNoteSave").onclick = () => { const v = $("#dNote").value.trim(); if (v) { notes[i.id] = v; if (!savedItems[i.id]) { if (!i._sec && NEWS_TABS[state.tab]) i._sec = state.tab; savedItems[i.id] = i; saved.add(i.id); localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems)); $(saveSel).textContent = "★ Saved"; } } else delete notes[i.id]; savePlan(); renderNoteBox(false); $("#dNoteSaved").textContent = v ? "Note saved ✓ — see Plan → Opportunity notes" : planCount(i.id); };
     } else {
       $("#dNoteBtn").onclick = () => renderNoteBox(true);
       $("#dPlan").onclick = () => { const text = prompt("Task for “" + i.title.slice(0, 40) + "…”", "Apply: " + i.title.slice(0, 60)); if (text === null) return; addTask(text, i.deadline || "", i); $("#dNoteSaved").textContent = planCount(i.id) + " · added to Daily plan ✓"; };
