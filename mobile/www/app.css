@@ -94,10 +94,10 @@ main{padding:0 12px;display:flex;flex-direction:column;gap:10px}
 .tabs .c-all{--c:#38bdf8}.tabs .c-soon{--c:#fbbf24}.tabs .c-off{--c:#c084fc}.tabs .c-news{--c:#34d399}.tabs .c-tech{--c:#60a5fa}.tabs .c-saved{--c:#f472b6}.tabs .c-plan{--c:#fb923c}.tabs .c-bell{--c:#f87171}
 .tabs button.on{background:var(--c);color:#0f172a;font-weight:700}.tabs button.on i{color:#0f172a}
 /* deep buttons under the region chips */
-.hub{display:flex;gap:6px;margin:4px 10px 8px}
-.hubbtn{flex:1;padding:6px 4px;border-radius:10px;opacity:.78;border:0;color:#fff;font:inherit;font-weight:800;font-size:12px;line-height:1.25;text-align:center;box-shadow:0 3px 0 var(--sh),0 6px 12px rgba(0,0,0,.4);transition:transform .08s,box-shadow .08s}
+.hub{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;margin:4px 12px 8px}
+.hubbtn{padding:2px 10px;border-radius:10px;opacity:.78;border:0;color:#fff;font:inherit;font-weight:800;font-size:12px;line-height:1.2;white-space:nowrap;box-shadow:0 3px 0 var(--sh),0 6px 12px rgba(0,0,0,.4);transition:transform .08s,box-shadow .08s}
 .hubbtn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--sh)}
-.hubbtn.on{opacity:1;outline:2px solid rgba(255,255,255,.55)}.hubbtn.sch{background:#b45309;--sh:#78350f}.hubbtn.news{background:#047857;--sh:#064e3b}.hubbtn.tech{background:#1d4ed8;--sh:#1e3a8a}
+.hubbtn.on{opacity:1;outline:2px solid rgba(255,255,255,.55)}.hubbtn.sch{background:#b45309;--sh:#78350f}.hubbtn.news{background:#047857;--sh:#064e3b}.hubbtn.tech{background:#1d4ed8;--sh:#1e3a8a}.hubbtn.jobs{background:#be185d;--sh:#831843}
 /* while inside School News / Tech the scholarship-only controls are hidden (they never apply to news) */
 body.mode-news .chips,body.mode-news #ann{display:none}
 /* news cards: title first (same size/weight as scholarship cards), category pill pinned top-right */
@@ -123,3 +123,69 @@ body.mode-news .chips,body.mode-news #ann{display:none}
 .card.has-img .star.on{color:var(--warn)}
 .ncard.has-img .ntype{top:12px;right:12px;background:rgba(15,23,42,.85);backdrop-filter:blur(4px)}
 .ncard.has-img.has-pill h3{padding-right:0}
+
+/* ---- Light theme (default): white background, high-contrast text ---- */
+:root{--bg:#f8fafc;--card:#ffffff;--muted:#475569;--txt:#0f172a;--acc:#0284c7;--ok:#059669;--warn:#d97706;--bad:#dc2626}
+html,body{background:var(--bg);color:var(--txt)}
+header{background:var(--bg);border-bottom:1px solid #e2e8f0}
+.brand span{color:var(--acc)}
+.search input{background:#fff;border-color:#cbd5e1;color:var(--txt)}
+.search button,button#apply,button#aSave,.more,#tAdd{background:var(--acc);color:#fff}
+button.ghost{border-color:#cbd5e1;color:#334155}
+#refreshBtn{border-color:#cbd5e1;color:var(--acc)}
+.chip{background:#fff;border-color:#cbd5e1;color:#475569}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.card,.ncard,.task,.plan-add{background:#fff;border-color:#e2e8f0;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+.card h3,.ncard h3,.card h3 a{color:#0f172a}
+.tag{background:#f1f5f9;border-color:#e2e8f0;color:#475569}
+.tag.fund{color:var(--ok);border-color:var(--ok)}.tag.lvl{color:var(--acc);border-color:var(--acc)}.tag.off{color:#7c3aed;border-color:#7c3aed}
+.star{color:#cbd5e1}.star.on{color:#f59e0b}
+.card.has-img .star{background:rgba(255,255,255,.85);color:#475569}
+.ad-card{background:#f1f5f9;border-color:#cbd5e1;color:#64748b}
+.disclaimer{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
+.stats{color:#64748b}
+.tabs{background:#fff;border-top:1px solid #e2e8f0}
+.tabs button{color:#64748b}
+.tabs .c-all{--c:#0284c7}.tabs .c-soon{--c:#d97706}.tabs .c-off{--c:#7c3aed}.tabs .c-news{--c:#059669}.tabs .c-tech{--c:#2563eb}.tabs .c-saved{--c:#db2777}.tabs .c-plan{--c:#ea580c}.tabs .c-bell{--c:#dc2626}
+.tabs button.on{color:#fff}.tabs button.on i{color:#fff}
+.sheet{background:rgba(15,23,42,.45)}
+.sheet-body{background:#fff}
+.sheet select,.sheet input:not([type=checkbox]),.detail textarea.note,.plan-add textarea,.plan-add input[type=date]{background:#fff;border-color:#cbd5e1;color:var(--txt)}
+.detail p{color:#1e293b}
+.ntype{background:#fff;border-color:#cbd5e1;color:#475569}
+.ncard.has-img .ntype{background:rgba(255,255,255,.9)}
+.nmeta{color:#64748b}
+.nimg{background:#e2e8f0}
+.nlogo{background:#f8fafc;border-bottom:1px solid #e2e8f0}
+.boost,.toast{background:linear-gradient(135deg,#e0f2fe,#ede9fe);border-color:#c7d2fe}
+.boost-tag,.toast-tag{color:#4f46e5}.boost-q,.toast-q{color:#1e1b4b}
+.boost-next,.toast-x{background:rgba(79,70,229,.1);color:#4f46e5}
+.offline{background:#fff7ed;color:#9a3412}
+.hubbtn{box-shadow:0 3px 0 var(--sh),0 4px 10px rgba(15,23,42,.15)}
+
+/* stronger text contrast everywhere */
+.card p,.ncard p{color:#334155}
+.meta,.nmeta,.nmeta .src{color:#475569}
+.stats,.disclaimer,.muted,.sheet label,.task .sub{color:#475569}
+.tag{color:#334155;border-color:#cbd5e1;background:#f1f5f9;font-weight:600}
+.chip{color:#334155;font-weight:600}
+.ntype{color:#334155;border-color:#94a3b8;font-weight:800}
+.dl.ok{color:#047857}.dl.soon{color:#b45309}.dl.past{color:#b91c1c}
+.tabs button{color:#334155;font-weight:600}
+.search input::placeholder{color:#64748b}
+.detail h2,.card h3,.ncard h3{color:#0f172a;font-weight:800}
+.detail p{color:#1e293b}
+.boost-q,.toast-q{color:#1e1b4b}
+.nmeta .go{color:#0369a1;font-weight:700}
+.ad-card{color:#475569}
+/* news category pills: solid, dark-enough colours on white */
+.ntype{background:#fff;border-width:1.5px}
+.ntype.adm{color:#047857;border-color:#047857;background:#ecfdf5}
+.ntype.sch{color:#6d28d9;border-color:#6d28d9;background:#f5f3ff}
+.ntype.fee{color:#b45309;border-color:#b45309;background:#fffbeb}
+.ntype.urg{color:#b91c1c;border-color:#b91c1c;background:#fef2f2}
+.ntype.cal{color:#1d4ed8;border-color:#1d4ed8;background:#eff6ff}
+.ntype.off{color:#1e293b;border-color:#64748b;background:#f1f5f9}
+.ncard.has-img .ntype{background:rgba(255,255,255,.95)}
+.ndot{background:#059669;box-shadow:0 0 0 3px rgba(5,150,105,.2)}
+.hubbtn.jobs{background:#be185d;--sh:#831843}
