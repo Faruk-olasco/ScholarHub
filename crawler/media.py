@@ -33,7 +33,7 @@ WD_UA = {"User-Agent": "ScholarHub/1.4 (https://faruk-olasco.github.io/ScholarHu
 TIMEOUT = 15
 
 # ----------------------------------------------------------------------------- picture rules
-BAD_IMG = re.compile(r"logo|icon|avatar|placeholder|default|blank|spinner|pixel|badge|favicon|wp-content/themes|emoji|advert|banner-ad|"
+BAD_IMG = re.compile(r"news\.google\.com|googleusercontent\.com/J6_coFbog|gstatic\.com/.*news|logo|icon|avatar|placeholder|default|blank|spinner|pixel|badge|favicon|wp-content/themes|emoji|advert|banner-ad|"
                      r"share|button|arrow|loading|gravatar|^data:|\.svg(\?|$)|\.gif(\?|$)|/flags?/|counter|tracking|1x1|spacer", re.I)
 STOCK = re.compile(r"unsplash\.com|pexels\.com|pixabay\.com|shutterstock|istockphoto|gettyimages\.com/detail|stock\.adobe|freepik|"
                    r"placeholder\.com|via\.placeholder|dummyimage|picsum\.photos|loremflickr", re.I)
@@ -123,6 +123,8 @@ def fetch_html(url):
 
 def find_image(url, entry=None, html=None):
     """Best real picture for an item, or None."""
+    if re.search(r"news\.google\.com|google\.com/url", url or ""):
+        return None   # aggregator redirect page – its og:image is the Google News logo, never a real picture
     cands = []
     if entry: cands += [urljoin(url, u) for u in _entry_images(entry)]
     if html is None and (not cands or not any(_ok_picture(c) for c in cands[:2])):
