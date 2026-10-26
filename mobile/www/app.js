@@ -144,7 +144,7 @@ async function askPermission() {
 async function applyDailyPush() {
   if (!isNative || !FCM) return;
   try {
-    try { await FCM.createChannel({ id: "scholarhub_daily", name: "Daily picks", description: "Five short updates a day: scholarships, school news, tech and closing-soon deadlines", importance: 4 }); } catch (e) {}
+    try { await FCM.createChannel({ id: "scholarhub_daily", name: "Daily picks", description: "Six short updates a day: scholarships, school news, jobs, tech and closing-soon deadlines", importance: 4 }); } catch (e) {}
     const want = notif.daily ? topicOf(notif.region) : null;
     const topics = ["all"].concat(FILTERS.regions.map(topicOf));
     for (const t of topics) { if (t !== want) { try { await FCM.unsubscribeFromTopic({ topic: t }); } catch (e) {} } }
@@ -211,7 +211,7 @@ async function initNativeAds() {
   try {
     nativeFeed = await AdMobJS.NativeAdFeed.create({
       feedId: "list", adId: window.ADMOB.nativeId, isTesting: window.ADMOB.testing, template: AdMobJS.NativeAdTemplate.Medium,
-      style: { backgroundColor: "#1e293b", cornerRadius: 14, headlineColor: "#f1f5f9", bodyColor: "#94a3b8", callToActionBackgroundColor: "#38bdf8", callToActionTextColor: "#0f172a" },
+      style: { backgroundColor: "#ffffff", cornerRadius: 14, headlineColor: "#0f172a", bodyColor: "#334155", callToActionBackgroundColor: "#0284c7", callToActionTextColor: "#ffffff" },
     });
     // if an ad can't be filled, collapse its slot so there is no empty box in the list
     try { nativeFeed.addListener(AdMobJS.NativeAdPluginEvents.FailedToLoad, (ev) => { const el = document.querySelector(`capacitor-admob-native[slot-key="${ev.slotKey}"]`); if (el && el.parentElement) el.parentElement.style.display = "none"; }); } catch (e) {}
@@ -312,13 +312,18 @@ async function load(reset = true) {
 // ---------- School News (Nigerian universities) & Tech Updates ----------
 // Standalone sections: they read ONLY the `school_news` / `tech_news` tables. The scholarship feeds never
 // query these tables, so news can never appear under All / Closing soon / Official / regions / Saved.
-const NEWS_TABS = { news: { table: "school_news", label: "School News · Nigeria", cols: "id,title,summary,url,source,tier,school_code,school,kind,published,image,logo" }, tech: { table: "tech_news", label: "Tech Updates", cols: "id,title,summary,url,source,tier,published,image,logo" } };
+const NEWS_TABS = {
+  news: { table: "school_news", label: "School News · Nigeria", cols: "id,title,summary,url,source,tier,school_code,school,kind,published,image,logo" },
+  tech: { table: "tech_news", label: "Tech Updates", cols: "id,title,summary,url,source,tier,published,image,logo" },
+  jobs: { table: "jobs", label: "Jobs · Nigeria & remote", cols: "id,title,summary,url,source,tier,company,location,kind,deadline,published,image,logo", open: "Apply on site ↗" },
+};
 const isNewsTab = () => !!NEWS_TABS[state.tab];
 const seenAt = {}; // when this tab was last opened (per session) -> items newer than that get a green dot
 function newsQuery(offset) {
   const t = NEWS_TABS[state.tab]; const p = new URLSearchParams();
   p.set("select", t.cols);
-  if (state.q) { const q = state.q.replace(/[%*,()."'\\:&|!<>]/g, " ").replace(/\s+/g, " ").trim(); if (q) p.set("or", `(title.wfts(english).${q},summary.wfts(english).${q}${state.tab === "news" ? `,school.ilike.*${q}*,school_code.ilike.*${q}*` : ""})`); }
+  if (state.q) { const q = state.q.replace(/[%*,()."'\\:&|!<>]/g, " ").replace(/\s+/g, " ").trim(); if (q) p.set("or", `(title.wfts(english).${q},summary.wfts(english).${q}${state.tab === "news" ? `,school.ilike.*${q}*,school_code.ilike.*${q}*` : state.tab === "jobs" ? `,company.ilike.*${q}*,location.ilike.*${q}*` : ""})`); }
+  if (state.tab === "jobs") { if (p.has("or")) { p.set("and", `(or${p.get("or")},or(deadline.is.null,deadline.gte.${today()}))`); p.delete("or"); } else p.set("or", `(deadline.is.null,deadline.gte.${today()})`); } // closed jobs disappear the day after the closing date
   p.set("order", "has_img.desc,published.desc"); p.set("limit", 30); p.set("offset", offset);
   return "/" + t.table + "?" + p.toString();
 }
@@ -339,20 +344,31 @@ async function loadNews(seq) {
     setOffline(true);
   }
 }
-const KIND_PILL = { admission: ["Admission", "adm"], scholarship: ["Scholarship", "sch"], fees: ["Fees", "fee"], calendar: ["Calendar", "cal"], notice: ["Notice", "urg"], convocation: ["Convocation", "cal"] };
+const KIND_PILL = { admission: ["Admission", "adm"], scholarship: ["Scholarship", "sch"], fees: ["Fees", "fee"], calendar: ["Calendar", "cal"], notice: ["Notice", "urg"], convocation: ["Convocation", "cal"],
+  graduate: ["Graduate", "adm"], internship: ["Internship", "cal"], ngo: ["NGO", "sch"], research: ["Research", "sch"], remote: ["Remote", "fee"], job: ["Job", "off"] };
+const whoLine = (i) => i.school ? esc(i.school) + " · " : i.company ? esc(i.company) + (i.location ? " · " + esc(i.location) : "") + " · " : i.location ? esc(i.location) + " · " : "";
 function ago(d) { const m = Math.max(0, Math.round((Date.now() - new Date(d)) / 60000)); if (m < 60) return m <= 1 ? "just now" : m + " min ago"; const h = Math.round(m / 60); if (h < 24) return h + " h ago"; const dd = Math.round(h / 24); if (dd < 7) return dd === 1 ? "yesterday" : dd + " days ago"; return new Date(d).toLocaleDateString([], { day: "numeric", month: "short" }); }
+function spreadEmployers(items) { // in-place: when two neighbours share an employer, pull the next different employer forward
+  const key = (i) => (i.company || i.source || "").toLowerCase().trim();
+  for (let k = 1; k < items.length; k++) {
+    if (key(items[k]) !== key(items[k - 1])) continue;
+    const j = items.findIndex((x, idx) => idx > k && key(x) !== key(items[k - 1]) && (k + 1 >= items.length || key(x) !== key(items[k + 1])));
+    if (j > k) { const [x] = items.splice(j, 1); items.splice(k, 0, x); }
+  }
+}
 function renderNews() {
   const list = $("#list"), t = NEWS_TABS[state.tab];
   $("#stats").textContent = `${state.total.toLocaleString()} updates · ${t.label}${state.q ? " · “" + state.q + "”" : ""}`;
   if (!state.items.length) { list.innerHTML = `<div class="empty">${state.q ? "No updates match your search." : "No updates yet — pull down to refresh."}</div>`; $("#more").classList.add("hidden"); return; }
   const since = seenAt[state.tab] || 0;
+  if (state.tab === "jobs") spreadEmployers(state.items); // never the same employer twice in a row
   list.innerHTML = state.items.map((i, idx) => {
     const pill = KIND_PILL[i.kind] ? `<span class="ntype ${KIND_PILL[i.kind][1]}">${KIND_PILL[i.kind][0]}</span>` : i.tier === "official" ? '<span class="ntype off">Official</span>' : "";
     const isNew = new Date(i.published).getTime() > since;
     return `${idx > 0 && idx % 4 === 0 ? (isNative ? nativeSlot(i) : '<div class="ad-card">Advertisement</div>') : ""}
     <div class="ncard${pill ? " has-pill" : ""}${hasMedia(i) ? " has-img" : ""}" data-id="${esc(i.id)}">${mediaHtml(i)}${pill}
-      <h3>${isNew ? '<span class="ndot"></span>' : ""}${esc(i.title)}</h3><p>${i.summary ? esc(i.summary) : "Tap to read the full update on " + esc(i.source) + "."}</p>
-      <div class="nmeta"><span class="src">${i.school ? esc(i.school) + " · " : ""}via ${esc(i.source)} · ${ago(i.published)}</span><span class="go">Read on site ↗</span></div>
+      <h3>${isNew ? '<span class="ndot"></span>' : ""}${esc(i.title)}</h3>${state.tab === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">🟢 Open — apply now</div>') : ""}<p>${i.summary ? esc(i.summary) : "Tap to read the full update on " + esc(i.source) + "."}</p>
+      <div class="nmeta"><span class="src">${whoLine(i)}via ${esc(i.source)} · ${ago(i.published)}</span><span class="go">${t.open || "Read on site ↗"}</span></div>
     </div>`; }).join("");
   $("#more").classList.toggle("hidden", state.offset >= state.total);
 }
@@ -362,25 +378,31 @@ function openNewsDetail(i) {
   const host = (() => { try { return new URL(i.url).hostname.replace(/^www\./, ""); } catch (e) { return ""; } })();
   $("#detailBody").innerHTML = `<div class="detail">${mediaHtml(i, true)}
     <h2>${esc(i.title)}</h2>
-    <div class="muted" style="margin:4px 0 10px">${i.school ? esc(i.school) + " · " : ""}via ${esc(i.source)} · ${ago(i.published)}${pill}</div>
-    <p>${esc(i.summary || "Open the full article to read more.")}</p>
-    <div class="muted" style="margin-top:6px;font-size:12px">ℹ️ Summary collected automatically from ${esc(host || i.source)}. Read the full article on the source website.</div>
-    <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#38bdf8">${esc(i.url)}</a></div>
+    <div class="muted" style="margin:4px 0 10px">${whoLine(i)}via ${esc(i.source)} · ${ago(i.published)}${pill}</div>
+    ${state.tab === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">🟢 Open — apply now (no closing date stated)</div>') : ""}
+    <p>${esc(i.summary || (state.tab === "jobs" ? "Open the listing for the full description and how to apply." : "Open the full article to read more."))}</p>
+    <div class="muted" style="margin-top:6px;font-size:12px">${state.tab === "jobs" ? "ℹ️ Independent app – we list jobs from public job boards and never charge for applications. Beware of anyone asking for money to process a job. Apply only on the employer's or job board's page below." : `ℹ️ Summary collected automatically from ${esc(host || i.source)}. Read the full article on the source website.`}</div>
+    <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#0369a1">${esc(i.url)}</a></div>
     <div class="actions">
       <button class="ghost" id="nShare">Share</button>
-      <button id="nOpen">Read full article ↗</button>
+      <button id="nOpen">${NEWS_TABS[state.tab].open || "Read full article ↗"}</button>
     </div></div>`;
   $("#detail").classList.remove("hidden");
   $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
   $("#nOpen").onclick = () => openUrl(i.url);
   $("#nShare").onclick = async () => {
-    const text = (state.tab === "news" ? "🏫 " : "💻 ") + i.title + (i.school ? "\n" + i.school : "") + "\n\n📲 Get ScholarHub free on Google Play – scholarships, school news & tech updates:\n" + PLAY_URL;
+    const text = (state.tab === "news" ? "🏫 " : state.tab === "jobs" ? "💼 " : "💻 ") + i.title + (i.school ? "\n" + i.school : i.company ? "\n" + i.company + (i.location ? " · " + i.location : "") : "") + (state.tab === "jobs" && i.deadline ? "\n⏰ Closes " + i.deadline : "") + "\n\n📲 Get ScholarHub free on Google Play – scholarships, school news, tech updates & jobs:\n" + PLAY_URL;
     try { if (Share && Share.share) return await Share.share({ title: i.title, text, dialogTitle: "Share" }); } catch (e) {}
     try { if (navigator.share) return await navigator.share({ title: i.title, text }); } catch (e) {}
     try { await navigator.clipboard.writeText(text); alert("Copied"); } catch (e) { prompt("Copy", text); }
   };
 }
-function setMode() { document.body.classList.toggle("mode-news", isNewsTab()); document.querySelectorAll(".hubbtn").forEach((b) => b.classList.toggle("on", (state.tab === "news" && b.id === "newsBtn") || (state.tab === "tech" && b.id === "techBtn") || (!isNewsTab() && b.id === "schBtn"))); const q = $("#q"); if (q) q.placeholder = state.tab === "news" ? "Search school news, e.g. UNILAG admission list…" : state.tab === "tech" ? "Search tech updates, e.g. AI, Starlink…" : "Search scholarships, e.g. PhD Canada…"; }
+function setMode() {
+  document.body.classList.toggle("mode-news", isNewsTab());
+  document.querySelectorAll(".hubbtn").forEach((b) => b.classList.toggle("on", (state.tab === "news" && b.id === "newsBtn") || (state.tab === "tech" && b.id === "techBtn") || (state.tab === "jobs" && b.id === "jobsBtn") || (!isNewsTab() && b.id === "schBtn")));
+  if (state.tab === "jobs") document.querySelectorAll(".tabs [data-tab]").forEach((x) => x.classList.remove("on")); // Jobs has no bottom tab
+  const q = $("#q"); if (q) q.placeholder = state.tab === "news" ? "Search school news, e.g. UNILAG admission list…" : state.tab === "tech" ? "Search tech updates, e.g. AI, Starlink…" : state.tab === "jobs" ? "Search jobs, e.g. graduate trainee, Lagos, remote…" : "Search scholarships, e.g. PhD Canada…";
+}
 
 // ---------- Announcement (admin-managed: Supabase table `announcements`; RLS only exposes active rows in their date window) ----------
 async function loadAnnouncement() {
@@ -520,12 +542,12 @@ function renderPlan() {
       <h3 style="padding-right:0"><a href="#" data-goto="${esc(sid)}">${esc(title)}</a></h3>
       ${deadlineHtml(it.deadline)}
       ${editing
-        ? `<textarea data-note="${esc(sid)}" aria-label="Note" style="width:100%;min-height:90px;margin-top:10px;padding:10px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:inherit;font-size:14px;line-height:1.45;font-family:inherit;resize:vertical;box-sizing:border-box">${esc(notes[sid])}</textarea>
+        ? `<textarea data-note="${esc(sid)}" aria-label="Note" style="width:100%;min-height:90px;margin-top:10px;padding:10px;border-radius:10px;border:1px solid #cbd5e1;background:#f1f5f9;color:inherit;font-size:14px;line-height:1.45;font-family:inherit;resize:vertical;box-sizing:border-box">${esc(notes[sid])}</textarea>
            <div class="row" style="justify-content:flex-end;gap:8px;margin-top:8px"><button class="ghost" data-ncancel="${esc(sid)}">Cancel</button><button data-nsave="${esc(sid)}">Save</button></div>`
-        : `<div style="margin-top:10px;padding:10px 12px;border-left:3px solid var(--acc);background:#0f172a;border-radius:8px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(notes[sid])}</div>
+        : `<div style="margin-top:10px;padding:10px 12px;border-left:3px solid var(--acc);background:#f1f5f9;border-radius:8px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(notes[sid])}</div>
            <div class="row" style="justify-content:flex-end;gap:14px;margin-top:10px;font-size:13px">
-             <a href="#" data-nedit="${esc(sid)}" style="color:#38bdf8;text-decoration:none">✎ Edit</a>
-             <a href="#" data-goto="${esc(sid)}" style="color:#38bdf8;text-decoration:none">Open ↗</a>
+             <a href="#" data-nedit="${esc(sid)}" style="color:#0369a1;text-decoration:none">✎ Edit</a>
+             <a href="#" data-goto="${esc(sid)}" style="color:#0369a1;text-decoration:none">Open ↗</a>
              <a href="#" data-ndel="${esc(sid)}" style="color:var(--bad);text-decoration:none">✕ Delete</a></div>`}
     </div>`; };
   if (planView === "notes") {
@@ -554,7 +576,7 @@ function openDetail(i) {
     <p>${esc(i.summary)}</p>
     <div class="muted">Source: ${esc(i.source)}${i.tier === "official" ? " (provider's own website)" : ""}</div>
     <div class="muted" style="margin-top:6px;font-size:12px">ℹ️ Independent app – not affiliated with any government, university or provider. Verify all details and apply only on the official page below.</div>
-    <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#38bdf8">${esc(i.url)}</a></div>
+    <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#0369a1">${esc(i.url)}</a></div>
     <div class="actions">
       <button class="ghost" id="dSave">${saved.has(i.id) ? "★ Saved" : "☆ Save"}</button>
       <button class="ghost" id="dShare">Share</button>
@@ -572,7 +594,7 @@ function openDetail(i) {
       ? `<div class="muted" style="margin-top:16px">📝 Opportunity note</div>
          <textarea class="note" id="dNote" placeholder="e.g. Need 2 reference letters, IELTS 6.5, submit before 15 March…">${esc(cur)}</textarea>
          <div class="row" style="justify-content:flex-end;gap:8px;margin-top:8px"><button class="ghost" id="dNoteCancel">Cancel</button><button id="dNoteSave">Save note</button></div>`
-      : `${cur ? `<div class="muted" style="margin-top:16px">📝 Opportunity note</div><div style="margin-top:6px;padding:10px 12px;border-left:3px solid var(--acc);background:#0f172a;border-radius:8px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(cur)}</div>` : ""}
+      : `${cur ? `<div class="muted" style="margin-top:16px">📝 Opportunity note</div><div style="margin-top:6px;padding:10px 12px;border-left:3px solid var(--acc);background:#f1f5f9;border-radius:8px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(cur)}</div>` : ""}
          <div class="row" style="gap:8px;margin-top:14px"><button class="ghost" id="dPlan" style="flex:1">＋ Add to plan</button><button class="ghost" id="dNoteBtn" style="flex:1">${cur ? "✎ Edit opportunity note" : "📝 Add to opportunity note"}</button></div>
          <div class="muted" id="dNoteSaved" style="margin-top:6px;font-size:12px">${planCount(i.id)}</div>`;
     if (editing) {
@@ -643,6 +665,7 @@ document.querySelectorAll(".tabs [data-tab]").forEach((b) => (b.onclick = () => 
 if ($("#schBtn")) $("#schBtn").onclick = () => document.querySelector('.tabs [data-tab="all"]').click();
 if ($("#newsBtn")) $("#newsBtn").onclick = () => document.querySelector('.tabs [data-tab="news"]').click();
 if ($("#techBtn")) $("#techBtn").onclick = () => document.querySelector('.tabs [data-tab="tech"]').click();
+if ($("#jobsBtn")) $("#jobsBtn").onclick = () => { if (state.tab === "jobs") return; if (state.q) { state.q = ""; $("#q").value = ""; } state.tab = "jobs"; setMode(); load(); window.scrollTo(0, 0); maybeInterstitial(); };
 $("#filtersBtn").onclick = () => $("#sheet").classList.remove("hidden");
 $("#apply").onclick = () => { state.level = $("#fLevel").value; state.funding = $("#fFunding").value; state.tier = $("#fTier").value; state.country = $("#fCountry").value.trim(); state.added = +($("#fAdded").value || 0); state.dlFrom = $("#fFrom").value; state.dlTo = $("#fTo").value; state.expired = $("#fExpired").checked ? 1 : 0; $("#sheet").classList.add("hidden"); load(); };
 $("#clear").onclick = () => { ["fLevel", "fFunding", "fTier", "fAdded", "fFrom", "fTo"].forEach((id) => ($("#" + id).value = "")); $("#fCountry").value = ""; $("#fExpired").checked = false; };
@@ -715,7 +738,7 @@ async function init() {
   }
   // notifications: react to taps, keep subscriptions in sync, offer once on the 2nd open
   async function openNewsById(ref) {
-    const [table, id] = String(ref).split(":"); const tab = table === "tech_news" ? "tech" : "news";
+    const [table, id] = String(ref).split(":"); const tab = table === "tech_news" ? "tech" : table === "jobs" ? "jobs" : "news";
     if (!NEWS_TABS[tab] || !id) return;
     try {
       const r = await api("/" + table + "?select=" + NEWS_TABS[tab].cols + "&id=eq." + encodeURIComponent(id));
