@@ -81,8 +81,14 @@ main{padding:0 12px;display:flex;flex-direction:column;gap:10px}
 #boot .boot-sub{color:#94a3b8;font-size:14px}
 
 /* Announcement (managed from the Supabase `announcements` table; no app update needed) */
-.ann{margin:0 12px 10px;padding:8px 10px;border-radius:10px;background:linear-gradient(135deg,#b91c1c,#dc2626);border:1px solid #f87171;color:#fff}
-.ann-tag{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+.ann{margin:0 12px 10px;border-radius:10px;background:linear-gradient(135deg,#b91c1c,#dc2626);border:1px solid #f87171;color:#fff;position:relative;overflow:hidden}
+.ann-track{display:flex;transition:transform .45s cubic-bezier(.22,.61,.36,1);will-change:transform}
+.ann-slide{flex:0 0 100%;box-sizing:border-box;padding:8px 10px}.ann.multi .ann-slide{padding-bottom:18px}
+.ann-tag{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;display:flex;justify-content:space-between}
+.ann-tag small{font-weight:600;opacity:.85;letter-spacing:0;text-transform:none}
+.ann-dots{position:absolute;left:0;right:0;bottom:5px;display:flex;justify-content:center;gap:5px;pointer-events:none}
+.ann-dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.45);transition:all .3s}.ann-dots i.on{background:#fff;width:16px;border-radius:3px}
+.ann-bar{position:absolute;left:0;bottom:0;height:2px;background:rgba(255,255,255,.7);width:0}.ann-bar.run{animation:annbar 5s linear forwards}@keyframes annbar{from{width:0}to{width:100%}}
 .ann b{font-size:12px;margin-right:4px}
 .ann p{display:inline;margin:0;font-size:12px;line-height:1.35;color:#fff;white-space:pre-wrap}
 .ann button{display:inline-block;margin-top:5px;padding:4px 9px;border-radius:8px;border:0;background:#fff;color:#b91c1c;font-weight:700;font-size:12px}
