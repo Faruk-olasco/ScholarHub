@@ -49,39 +49,39 @@ function drawCard(i, photo, logo) {
   const sumLines = wrap(i.summary, 32, 400, W - 2 * P, 4);
   const kindTxt = (KIND_PILL[i.kind] || [])[0];
   const tagList = sec ? [kindTxt, i.company, i.location, i.school].filter(Boolean) : [i.tier === "official" ? "🏛 official" : "", i.funding, ...(i.levels || "").split(", ").filter(Boolean).slice(0, 2), ...(i.countries || "").split(", ").filter(Boolean).slice(0, 2)].filter(Boolean);
-  let days = null, dlTxt = isNews ? "" : isJob ? "🟢 Open — apply now" : "🟢 Open — apply now (no deadline stated)", dlCol = "#34d399";
-  if (i.deadline) { days = Math.round((new Date(i.deadline) - new Date().setHours(0, 0, 0, 0)) / 864e5); dlTxt = `⏰ ${isJob ? "Closes" : "Deadline"} ${i.deadline} (${days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left"})`; dlCol = days < 0 ? "#f87171" : days <= 14 ? "#fbbf24" : "#34d399"; }
+  let days = null, dlTxt = isNews ? "" : isJob ? "🟢 Open — apply now" : "🟢 Open — apply now (no deadline stated)", dlCol = "#047857";
+  if (i.deadline) { days = Math.round((new Date(i.deadline) - new Date().setHours(0, 0, 0, 0)) / 864e5); dlTxt = `⏰ ${isJob ? "Closes" : "Deadline"} ${i.deadline} (${days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left"})`; dlCol = days < 0 ? "#b91c1c" : days <= 14 ? "#b45309" : "#047857"; }
   const imgH = photo ? 460 : logo ? 240 : 0;
   const H = 150 + imgH + titleLines.length * 62 + 60 + sumLines.length * 44 + (tagList.length ? 80 : 20) + 60 + 232 + 150;
   c.width = W; c.height = H;
-  x.fillStyle = "#0f172a"; x.fillRect(0, 0, W, H);
+  x.fillStyle = "#f1f5f9"; x.fillRect(0, 0, W, H);
   // header
-  font(40, 800); x.fillStyle = "#e2e8f0"; x.fillText("🎓 Scholar", P, 80); const sw = x.measureText("🎓 Scholar").width; x.fillStyle = "#38bdf8"; x.fillText("Hub", P + sw, 80);
-  font(26, 700); x.fillStyle = "#34d399"; x.textAlign = "right"; x.fillText("● LIVE", W - P, 76); x.textAlign = "left";
+  font(40, 800); x.fillStyle = "#0f172a"; x.fillText("🎓 Scholar", P, 80); const sw = x.measureText("🎓 Scholar").width; x.fillStyle = "#0284c7"; x.fillText("Hub", P + sw, 80);
+  font(26, 700); x.fillStyle = "#059669"; x.textAlign = "right"; x.fillText("● LIVE", W - P, 76); x.textAlign = "left";
   // card
-  const cy = 120, cw = W - 2 * P + 40; rr(P - 20, cy, cw, H - cy - 130, 28, "#1e293b", "#273449");
+  const cy = 120, cw = W - 2 * P + 40; rr(P - 20, cy, cw, H - cy - 130, 28, "#ffffff", "#e2e8f0");
   if (imgH) { // picture: full card width, cropped to fill; logo: large, centred on a light panel
     x.save(); x.beginPath(); x.roundRect(P - 20, cy, cw, imgH, [28, 28, 0, 0]); x.clip();
     if (photo) { const s = Math.max(cw / photo.naturalWidth, imgH / photo.naturalHeight), dw = photo.naturalWidth * s, dh = photo.naturalHeight * s; x.drawImage(photo, P - 20 + (cw - dw) / 2, cy + (imgH - dh) / 2, dw, dh); }
-    else { x.fillStyle = "#f8fafc"; x.fillRect(P - 20, cy, cw, imgH); const s = Math.min((cw - 120) / logo.naturalWidth, (imgH - 60) / logo.naturalHeight), dw = logo.naturalWidth * s, dh = logo.naturalHeight * s; x.drawImage(logo, P - 20 + (cw - dw) / 2, cy + (imgH - dh) / 2, dw, dh); }
+    else { x.fillStyle = "#ffffff"; x.fillRect(P - 20, cy, cw, imgH); const s = Math.min((cw - 120) / logo.naturalWidth, (imgH - 60) / logo.naturalHeight), dw = logo.naturalWidth * s, dh = logo.naturalHeight * s; x.drawImage(logo, P - 20 + (cw - dw) / 2, cy + (imgH - dh) / 2, dw, dh); }
     x.restore();
   }
-  let y = cy + imgH + 80; font(50, 800); x.fillStyle = "#f1f5f9"; for (const l of titleLines) { x.fillText(l, P + 10, y); y += 62; }
+  let y = cy + imgH + 80; font(50, 800); x.fillStyle = "#0f172a"; for (const l of titleLines) { x.fillText(l, P + 10, y); y += 62; }
   if (dlTxt) { y += 6; font(30, 700); x.fillStyle = dlCol; x.fillText(dlTxt, P + 10, y); y += 54; } else y += 10;
-  font(32, 400); x.fillStyle = "#94a3b8"; for (const l of sumLines) { x.fillText(l, P + 10, y); y += 44; }
-  if (tagList.length) { y += 12; let tx = P + 10; font(26, 600); for (const t of tagList) { const w = x.measureText(t).width + 36; if (tx + w > W - P) break; rr(tx, y - 30, w, 46, 23, "#0f172a", "#334155"); x.fillStyle = t === i.funding ? "#34d399" : t.startsWith("🏛") ? "#c084fc" : "#94a3b8"; x.fillText(t, tx + 18, y + 2); tx += w + 12; } y += 60; }
+  font(32, 400); x.fillStyle = "#475569"; for (const l of sumLines) { x.fillText(l, P + 10, y); y += 44; }
+  if (tagList.length) { y += 12; let tx = P + 10; font(26, 600); for (const t of tagList) { const w = x.measureText(t).width + 36; if (tx + w > W - P) break; rr(tx, y - 30, w, 46, 23, "#f1f5f9", "#e2e8f0"); x.fillStyle = t === i.funding ? "#047857" : t.startsWith("🏛") ? "#6d28d9" : "#334155"; x.fillText(t, tx + 18, y + 2); tx += w + 12; } y += 60; }
   font(26, 400); x.fillStyle = "#64748b"; x.fillText(`via ${i.source || ""}`, P + 10, y + 10);
   // official link shown as plain text (proof of source; an image can't be tapped)
-  font(24, 400); x.fillStyle = "#38bdf8"; let link = String(i.url || "").replace(/^https?:\/\//, ""); while (x.measureText(link).width > W - 2 * P - 20 && link.length > 10) link = link.slice(0, -2); if (link !== String(i.url || "").replace(/^https?:\/\//, "")) link += "…"; x.fillText("🔗 " + link, P + 10, y + 50);
+  font(24, 400); x.fillStyle = "#0369a1"; let link = String(i.url || "").replace(/^https?:\/\//, ""); while (x.measureText(link).width > W - 2 * P - 20 && link.length > 10) link = link.slice(0, -2); if (link !== String(i.url || "").replace(/^https?:\/\//, "")) link += "…"; x.fillText("🔗 " + link, P + 10, y + 50);
   // action buttons, exactly like the detail screen (shows the tracking features)
-  const btn = (X, Y, w, label, filled) => { rr(X, Y, w, 64, 16, filled ? "#38bdf8" : "#0f172a", filled ? null : "#334155"); font(26, 700); x.fillStyle = filled ? "#0f172a" : filled === false ? "#94a3b8" : "#94a3b8"; x.textAlign = "center"; x.fillText(label, X + w / 2, Y + 41); x.textAlign = "left"; };
+  const btn = (X, Y, w, label, filled) => { rr(X, Y, w, 64, 16, filled ? "#0284c7" : "#ffffff", filled ? null : "#cbd5e1"); font(26, 700); x.fillStyle = filled ? "#ffffff" : "#334155"; x.textAlign = "center"; x.fillText(label, X + w / 2, Y + 41); x.textAlign = "left"; };
   const bx = P + 10, bw = W - 2 * P - 20, g = 14; y += 90;
   const w3 = (bw - 2 * g) / 3; btn(bx, y, w3, "☆ Save", false); btn(bx + w3 + g, y, w3, "Share", false); btn(bx + 2 * (w3 + g), y, w3, isJob ? "Apply on site ↗" : isNews ? "Read on site ↗" : "Apply / Details ↗", true);
   y += 64 + g; const w2 = (bw - g) / 2; btn(bx, y, w2, "＋ Add to plan", false); btn(bx + w2 + g, y, w2, "📝 Add to opportunity note", false);
   // footer: Play Store call-to-action
-  const fy = H - 100; rr(P, fy, W - 2 * P, 70, 18, "#38bdf8"); font(30, 800); x.fillStyle = "#0f172a"; x.textAlign = "center"; const lbl = "Get ScholarHub free on Google Play"; const lw = x.measureText(lbl).width; x.fillText(lbl, W / 2 + 22, fy + 46); x.textAlign = "left";
+  const fy = H - 100; rr(P, fy, W - 2 * P, 70, 18, "#0284c7"); font(30, 800); x.fillStyle = "#ffffff"; x.textAlign = "center"; const lbl = "Get ScholarHub free on Google Play"; const lw = x.measureText(lbl).width; x.fillText(lbl, W / 2 + 22, fy + 46); x.textAlign = "left";
   // drawn down-arrow (not an emoji, so it shows on every device): points to the link under the picture
-  const ax = W / 2 - lw / 2 - 20, ay = fy + 35; x.fillStyle = "#0f172a"; x.fillRect(ax - 6, ay - 20, 12, 24); x.beginPath(); x.moveTo(ax - 16, ay + 2); x.lineTo(ax + 16, ay + 2); x.lineTo(ax, ay + 20); x.closePath(); x.fill();
+  const ax = W / 2 - lw / 2 - 20, ay = fy + 35; x.fillStyle = "#ffffff"; x.fillRect(ax - 6, ay - 20, 12, 24); x.beginPath(); x.moveTo(ax - 16, ay + 2); x.lineTo(ax + 16, ay + 2); x.lineTo(ax, ay + 20); x.closePath(); x.fill();
   return c.toDataURL("image/png");
 }
 function shareText(i) {
