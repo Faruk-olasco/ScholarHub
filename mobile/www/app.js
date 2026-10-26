@@ -430,7 +430,7 @@ function setMode() {
 async function loadAnnouncement() {
   const box = $("#ann"); if (!box) return;
   try {
-    const r = await api("/announcements?select=id,title,body,link_url,link_text&order=created_at.desc&limit=4");
+    const r = await api("/announcements?select=id,title,body,link_url,link_text,color&order=created_at.desc&limit=4");
     if (!r.items.length) { box.classList.add("hidden"); box.innerHTML = ""; annStop(); localStorage.removeItem("ann"); return; }
     localStorage.setItem("ann", JSON.stringify(r.items)); showAnnouncement(r.items);
   } catch (e) { const c = JSON.parse(localStorage.getItem("ann") || "null"); if (c) showAnnouncement(Array.isArray(c) ? c : [c]); } // offline: keep the last ones seen
@@ -446,10 +446,13 @@ function annGo(k) {
   const b = $("#ann .ann-bar"); if (b) { void b.offsetWidth; b.classList.add("run"); }
   annTimer = setTimeout(() => annGo(annIdx + 1), 5000);
 }
+// Colour per announcement, set from Supabase (`color` column): a preset name (red, blue, green, purple, orange, pink, teal, dark) or any hex like #0f766e. Empty = red.
+const ANN_COLORS = { red: ["#b91c1c", "#dc2626"], blue: ["#1d4ed8", "#2563eb"], green: ["#047857", "#059669"], purple: ["#6d28d9", "#7c3aed"], orange: ["#c2410c", "#ea580c"], pink: ["#be185d", "#db2777"], teal: ["#0f766e", "#0d9488"], dark: ["#0f172a", "#334155"] };
+function annStyle(c) { c = String(c || "").trim().toLowerCase(); const p = ANN_COLORS[c] || (/^#[0-9a-f]{6}$/.test(c) ? [c, c] : ANN_COLORS.red); return `background:linear-gradient(135deg,${p[0]},${p[1]})`; }
 function showAnnouncement(list) {
   const box = $("#ann"); annN = list.length; annIdx = 0;
   const slide = (a, k) => { const link = a.link_url && /^https?:\/\//i.test(a.link_url) ? `<div><button data-ann-link="${esc(a.link_url)}">${esc(a.link_text || "Open link →")}</button></div>` : "";
-    return `<div class="ann-slide"><div class="ann-tag"><span>📣 Announcement</span>${annN > 1 ? `<small>${k + 1}/${annN}</small>` : ""}</div>${a.title ? `<b>${esc(a.title)}</b>` : ""}${a.body ? `<p>${esc(a.body)}</p>` : ""}${link}</div>`; };
+    return `<div class="ann-slide" style="${annStyle(a.color)}"><div class="ann-tag"><span>📣 Announcement</span>${annN > 1 ? `<small>${k + 1}/${annN}</small>` : ""}</div>${a.title ? `<b>${esc(a.title)}</b>` : ""}${a.body ? `<p>${esc(a.body)}</p>` : ""}${link}</div>`; };
   box.innerHTML = `<div class="ann-track">${list.map(slide).join("")}</div>${annN > 1 ? `<div class="ann-dots">${list.map((_, k) => `<i class="${k ? "" : "on"}"></i>`).join("")}</div><div class="ann-bar"></div>` : ""}`;
   box.classList.toggle("multi", annN > 1); box.classList.remove("hidden");
   annGo(0);
