@@ -195,6 +195,43 @@ def get(url):
     return r
 
 
+DATE_RX = re.compile(r"\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?,?\s+20\d\d|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+20\d\d|20\d\d-\d\d-\d\d)\b", re.I)
+YEAR_RX = re.compile(r"\b(20[12]\d)\b")
+
+
+def article_date(url):
+    """Opens an article and returns its publish date (meta tags, JSON-LD, <time>, or a date in the first lines). None if unsure."""
+    try:
+        r = get(url)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for m in soup.find_all("meta"):
+            k = (m.get("property") or m.get("name") or m.get("itemprop") or "").lower()
+            if k in ("article:published_time", "datepublished", "pubdate", "publishdate", "date", "dc.date", "dc.date.issued", "parsely-pub-date", "sailthru.date", "og:updated_time", "article:modified_time"):
+                d = parse_date(m.get("content") or "")
+                if d: return d
+        m = re.search(r'"datePublished"\s*:\s*"([^"]+)"', r.text)
+        if m:
+            d = parse_date(m.group(1))
+            if d: return d
+        tm = soup.find("time")
+        if tm:
+            d = parse_date(tm.get("datetime") or tm.get_text())
+            if d: return d
+        for t in soup(["script", "style", "nav", "header", "footer", "aside", "form"]): t.decompose()
+        main = soup.find("article") or soup.find("main") or soup.body or soup
+        m = DATE_RX.search(clean(main.get_text(" "))[:1500])
+        if m: return parse_date(m.group(1))
+    except Exception:
+        pass
+    return None
+
+
+def looks_old(title, url, now):
+    """Undated item whose title/URL only mentions past years (e.g. '2025 UTME' seen in 2026) -> treat as old."""
+    years = [int(y) for y in YEAR_RX.findall(title + " " + url)]
+    return bool(years) and max(years) < now.year
+
+
 def article_summary(url):
     """Opens an article and returns the first ~600 chars of its main text (best effort)."""
     try:
@@ -281,9 +318,16 @@ def crawl_one(job):
     except Exception as e:
         log.warning("%s failed: %s", source, str(e)[:120]); return table, source, []
     now = datetime.now(UTC)
+    if kind != "rss":  # list pages often carry no dates: open the undated articles (a handful per source) to find the real date
+        undated = [it for it in items if not it["published"]][:12]
+        if undated:
+            with ThreadPoolExecutor(4) as ex:
+                for it, d in zip(undated, ex.map(article_date, [it["url"] for it in undated])):
+                    if d and d <= now + timedelta(hours=12): it["published"] = d
     rows = []
     for it in items:
         txt = it["title"] + " " + it["summary"]
+        if not it["published"] and looks_old(it["title"], it["url"], now): continue   # '2025 UTME' in 2026 = archive, not news
         if edu_filter and not EDU_RE.search(txt): continue
         if table == "tech_news" and not TECH_RE.search(txt): continue
         if it["published"] and it["published"] < now - timedelta(days=MAX_AGE_DAYS[table]): continue
@@ -332,6 +376,17 @@ def main():
         for i in range(0, len(ids), 200):
             res = SB.table(table).select("id").in_("id", ids[i:i + 200]).execute()
             existing |= {x["id"] for x in (res.data or [])}
+        # a source seen for the first time whose list page has no dates: keep only its first 5 links (newest-first); the rest is archive
+        srcs = {r["source"] for r in rows if r.get("_undated")}
+        if srcs:
+            have = {x["source"] for x in (SB.table(table).select("source").in_("source", list(srcs)).limit(1000).execute().data or [])}
+            keep, cnt = [], {}
+            for r in rows:
+                if r.get("_undated") and r["source"] not in have and r["id"] not in existing:
+                    cnt[r["source"]] = cnt.get(r["source"], 0) + 1
+                    if cnt[r["source"]] > 5: continue
+                keep.append(r)
+            rows = keep
         new_rows = [r for r in rows if r["id"] not in existing]
         entry_imgs = {r["id"]: r.pop("_entry_imgs", None) for r in rows}
         for r in rows:  # undated items keep the `published` of their first insert (otherwise they would float to the top every crawl)
