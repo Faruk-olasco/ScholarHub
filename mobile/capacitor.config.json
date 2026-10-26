@@ -8,12 +8,12 @@
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 1200,
-      "backgroundColor": "#0f172a",
+      "backgroundColor": "#f8fafc",
       "androidScaleType": "CENTER_CROP"
     },
     "StatusBar": {
-      "style": "DARK",
-      "backgroundColor": "#0f172a"
+      "style": "LIGHT",
+      "backgroundColor": "#f8fafc"
     },
     "Browser": {}
   },
