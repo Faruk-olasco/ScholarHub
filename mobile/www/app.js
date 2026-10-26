@@ -30,7 +30,15 @@ async function openUrl(url) {
 const PLAY_URL = "https://play.google.com/store/apps/details?id=com.scholarhub.app";
 const FS = Cap && Cap.Plugins && Cap.Plugins.Filesystem; // used only to hand the card image to the share sheet
 // Draw the scholarship card as an image (what the receiver sees in WhatsApp/Telegram), 1080px wide
-function cardImage(i) {
+// The card's own picture (or the institution logo) is drawn at the top, exactly like in the app.
+const loadImg = (u) => new Promise((res) => { if (!u) return res(null); const im = new Image(); im.crossOrigin = "anonymous"; const t = setTimeout(() => res(null), 7000); im.onload = () => { clearTimeout(t); res(im); }; im.onerror = () => { clearTimeout(t); res(null); }; im.src = u; });
+// Most picture hosts don't allow canvas use directly (CORS); the free images.weserv.nl mirror adds the needed header.
+const loadImgAny = async (u) => (u ? (await loadImg(u)) || (await loadImg("https://images.weserv.nl/?url=" + encodeURIComponent(u.replace(/^https?:\/\//, "")) + "&w=1080&output=png")) : null);
+async function cardImage(i) {
+  const photo = await loadImgAny(i.image), logo = photo ? null : await loadImgAny(i.logo);
+  try { return drawCard(i, photo, logo); } catch (e) { return drawCard(i, null, null); } // picture host without CORS → card without picture
+}
+function drawCard(i, photo, logo) {
   const W = 1080, P = 56, c = document.createElement("canvas"), x = c.getContext("2d");
   const font = (px, w = 400) => (x.font = `${w} ${px}px system-ui, Roboto, "Noto Color Emoji", sans-serif`);
   const wrap = (txt, px, w, maxW, maxLines) => { font(px, w); const out = []; let line = ""; for (const word of String(txt || "").split(/\s+/)) { const t = line ? line + " " + word : word; if (x.measureText(t).width > maxW && line) { out.push(line); line = word; if (out.length === maxLines) break; } else line = t; } if (out.length < maxLines && line) out.push(line); if (out.length === maxLines && x.measureText(out[maxLines - 1]).width > maxW - 30) out[maxLines - 1] = out[maxLines - 1].replace(/\s?\S*$/, "") + "…"; return out; };
@@ -41,15 +49,22 @@ function cardImage(i) {
   const tagList = [i.tier === "official" ? "🏛 official" : "", i.funding, ...(i.levels || "").split(", ").filter(Boolean).slice(0, 2), ...(i.countries || "").split(", ").filter(Boolean).slice(0, 2)].filter(Boolean);
   let days = null, dlTxt = "🟢 Open — apply now (no deadline stated)", dlCol = "#34d399";
   if (i.deadline) { days = Math.round((new Date(i.deadline) - new Date().setHours(0, 0, 0, 0)) / 864e5); dlTxt = `⏰ Deadline ${i.deadline} (${days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left"})`; dlCol = days < 0 ? "#f87171" : days <= 14 ? "#fbbf24" : "#34d399"; }
-  const H = 150 + titleLines.length * 62 + 60 + sumLines.length * 44 + (tagList.length ? 80 : 20) + 60 + 232 + 150;
+  const imgH = photo ? 460 : logo ? 240 : 0;
+  const H = 150 + imgH + titleLines.length * 62 + 60 + sumLines.length * 44 + (tagList.length ? 80 : 20) + 60 + 232 + 150;
   c.width = W; c.height = H;
   x.fillStyle = "#0f172a"; x.fillRect(0, 0, W, H);
   // header
   font(40, 800); x.fillStyle = "#e2e8f0"; x.fillText("🎓 Scholar", P, 80); const sw = x.measureText("🎓 Scholar").width; x.fillStyle = "#38bdf8"; x.fillText("Hub", P + sw, 80);
   font(26, 700); x.fillStyle = "#34d399"; x.textAlign = "right"; x.fillText("● LIVE", W - P, 76); x.textAlign = "left";
   // card
-  const cy = 120; rr(P - 20, cy, W - 2 * P + 40, H - cy - 130, 28, "#1e293b", "#273449");
-  let y = cy + 80; font(50, 800); x.fillStyle = "#f1f5f9"; for (const l of titleLines) { x.fillText(l, P + 10, y); y += 62; }
+  const cy = 120, cw = W - 2 * P + 40; rr(P - 20, cy, cw, H - cy - 130, 28, "#1e293b", "#273449");
+  if (imgH) { // picture: full card width, cropped to fill; logo: large, centred on a light panel
+    x.save(); x.beginPath(); x.roundRect(P - 20, cy, cw, imgH, [28, 28, 0, 0]); x.clip();
+    if (photo) { const s = Math.max(cw / photo.naturalWidth, imgH / photo.naturalHeight), dw = photo.naturalWidth * s, dh = photo.naturalHeight * s; x.drawImage(photo, P - 20 + (cw - dw) / 2, cy + (imgH - dh) / 2, dw, dh); }
+    else { x.fillStyle = "#f8fafc"; x.fillRect(P - 20, cy, cw, imgH); const s = Math.min((cw - 120) / logo.naturalWidth, (imgH - 60) / logo.naturalHeight), dw = logo.naturalWidth * s, dh = logo.naturalHeight * s; x.drawImage(logo, P - 20 + (cw - dw) / 2, cy + (imgH - dh) / 2, dw, dh); }
+    x.restore();
+  }
+  let y = cy + imgH + 80; font(50, 800); x.fillStyle = "#f1f5f9"; for (const l of titleLines) { x.fillText(l, P + 10, y); y += 62; }
   y += 6; font(30, 700); x.fillStyle = dlCol; x.fillText(dlTxt, P + 10, y); y += 54;
   font(32, 400); x.fillStyle = "#94a3b8"; for (const l of sumLines) { x.fillText(l, P + 10, y); y += 44; }
   if (tagList.length) { y += 12; let tx = P + 10; font(26, 600); for (const t of tagList) { const w = x.measureText(t).width + 36; if (tx + w > W - P) break; rr(tx, y - 30, w, 46, 23, "#0f172a", "#334155"); x.fillStyle = t === i.funding ? "#34d399" : t.startsWith("🏛") ? "#c084fc" : "#94a3b8"; x.fillText(t, tx + 18, y + 2); tx += w + 12; } y += 60; }
@@ -72,7 +87,7 @@ async function shareItem(i) {
   // 1) native: save the card image to cache and share image + text
   try {
     if (Share && Share.share && FS && FS.writeFile) {
-      const data = cardImage(i).split(",")[1];
+      const data = (await cardImage(i)).split(",")[1];
       const f = await FS.writeFile({ path: "share-" + Date.now() + ".png", data, directory: "CACHE" });
       return await Share.share({ title: i.title, text, files: [f.uri], dialogTitle: "Share scholarship" });
     }
@@ -80,7 +95,7 @@ async function shareItem(i) {
   // 2) web: share the image file if the browser supports it
   try {
     if (navigator.share && navigator.canShare) {
-      const blob = await (await fetch(cardImage(i))).blob(); const file = new File([blob], "scholarhub.png", { type: "image/png" });
+      const blob = await (await fetch(await cardImage(i))).blob(); const file = new File([blob], "scholarhub.png", { type: "image/png" });
       if (navigator.canShare({ files: [file] })) return await navigator.share({ title: i.title, text, files: [file] });
     }
   } catch (e) {}
@@ -365,7 +380,7 @@ function openNewsDetail(i) {
     try { await navigator.clipboard.writeText(text); alert("Copied"); } catch (e) { prompt("Copy", text); }
   };
 }
-function setMode() { document.body.classList.toggle("mode-news", isNewsTab()); const q = $("#q"); if (q) q.placeholder = state.tab === "news" ? "Search school news, e.g. UNILAG admission list…" : state.tab === "tech" ? "Search tech updates, e.g. AI, Starlink…" : "Search scholarships, e.g. PhD Canada…"; }
+function setMode() { document.body.classList.toggle("mode-news", isNewsTab()); document.querySelectorAll(".hubbtn").forEach((b) => b.classList.toggle("on", (state.tab === "news" && b.id === "newsBtn") || (state.tab === "tech" && b.id === "techBtn") || (!isNewsTab() && b.id === "schBtn"))); const q = $("#q"); if (q) q.placeholder = state.tab === "news" ? "Search school news, e.g. UNILAG admission list…" : state.tab === "tech" ? "Search tech updates, e.g. AI, Starlink…" : "Search scholarships, e.g. PhD Canada…"; }
 
 // ---------- Announcement (admin-managed: Supabase table `announcements`; RLS only exposes active rows in their date window) ----------
 async function loadAnnouncement() {
@@ -625,6 +640,7 @@ document.addEventListener("touchstart", (e) => { ptrY = e.touches[0].clientY; pt
 document.addEventListener("touchmove", (e) => { if (!ptrOn) return; const d = e.touches[0].clientY - ptrY; if ($("#ptr")) $("#ptr").style.height = Math.min(Math.max(d / 2, 0), 60) + "px"; }, { passive: true });
 document.addEventListener("touchend", (e) => { const d = e.changedTouches[0].clientY - ptrY; if ($("#ptr")) $("#ptr").style.height = "0px"; if (ptrOn && d > 110) refresh(); ptrOn = false; }, { passive: true });
 document.querySelectorAll(".tabs [data-tab]").forEach((b) => (b.onclick = () => { document.querySelectorAll(".tabs [data-tab]").forEach((x) => x.classList.remove("on")); b.classList.add("on"); const wasNews = isNewsTab(); state.tab = b.dataset.tab; if (wasNews !== isNewsTab() && state.q) { state.q = ""; $("#q").value = ""; } setMode(); load(); window.scrollTo(0, 0); maybeInterstitial(); })); // tab switch = natural break point
+if ($("#schBtn")) $("#schBtn").onclick = () => document.querySelector('.tabs [data-tab="all"]').click();
 if ($("#newsBtn")) $("#newsBtn").onclick = () => document.querySelector('.tabs [data-tab="news"]').click();
 if ($("#techBtn")) $("#techBtn").onclick = () => document.querySelector('.tabs [data-tab="tech"]').click();
 $("#filtersBtn").onclick = () => $("#sheet").classList.remove("hidden");
