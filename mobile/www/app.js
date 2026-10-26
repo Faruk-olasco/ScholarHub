@@ -242,7 +242,7 @@ function initAppOpen() {
   setTimeout(finish, 4000);
   CapApp.addListener("appStateChange", async ({ isActive }) => {
     if (!isActive) return;
-    if (ready && Date.now() - lastShown > 4 * 60000) await show(); else if (!ready) prep();
+    if (ready && Date.now() - lastShown > 20 * 60000) await show(); else if (!ready) prep();
   });
 }
 // Interstitial: first scholarship opened / tab switch / 2nd+ "Load more" in this session, then at most one every M minutes (all triggers share the cap)
