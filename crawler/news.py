@@ -7,7 +7,7 @@ tables. Nothing here touches `scholarships`, so news can never appear in the sch
 Env: SUPABASE_URL, SUPABASE_SERVICE_KEY   (same secrets as run.py)
 Run:  python crawler/news.py             (called by .github/workflows/crawl.yml after run.py)
 """
-import os, re, html, hashlib, logging, time
+import os, re, sys, html, hashlib, logging, time
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin, urlparse
@@ -16,6 +16,9 @@ import requests, feedparser
 from bs4 import BeautifulSoup
 from dateutil import parser as dparser
 from supabase import create_client
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from app.scraper import resolve_link      # decodes Google News redirect links into the real article URL
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("news")
@@ -176,6 +179,8 @@ for code, name, aliases, _, _ in SCHOOLS:
     for a in set(aliases + [name]):
         _ALIASES.append((re.compile(r"(?<![A-Za-z])" + re.escape(a.strip()) + r"(?![A-Za-z])", re.I), code, name))
 _ALIASES.sort(key=lambda t: -len(t[0].pattern))  # longest alias first
+
+
 def match_school(text):
     for rx, code, name in _ALIASES:
         if rx.search(text): return code, name
@@ -220,6 +225,11 @@ def from_rss(url, source):
             try: src = e.source.title
             except Exception: pass
             title = re.sub(r"\s+-\s+[^-]+$", "", title)  # strip " - Publisher"
+            # Google News gives a redirect link (news.google.com/rss/articles/...). Decode it to the real
+            # article URL; if that fails, skip the item – a Google URL would give us the Google News logo as picture.
+            try: link = resolve_link(link)
+            except Exception: link = None
+            if not link or "news.google.com" in link: continue
         row = {"title": title, "url": link, "summary": summ[:600], "published": pub, "source": src}
         try:
             from media import _entry_images
