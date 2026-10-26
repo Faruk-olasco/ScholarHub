@@ -1,9 +1,10 @@
 """
-notify.py — five rich notifications per day, per audience topic, at local times.
+notify.py — six rich notifications per day, per audience topic, at local times.
 
 Slots (local time of the audience; the GitHub schedule runs every hour at :30):
   07:30  morning   best scholarship (new ones first)
   10:30  news      School News top story
+  12:30  jobs      best new job (graduate / internship / NGO / research / remote)
   13:30  tech      Tech Updates top story
   16:30  closing   a scholarship closing within 2–7 days
   19:30  evening   best scholarship (new ones first)  — deadline reminders for saved items are local on the phone
@@ -27,7 +28,7 @@ SB = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"
 # topic -> (display region, UTC offset hours). Offsets are "typical" – a slot lands within an hour of target time.
 TOPICS = {"all": ("", 1), "r_africa": ("Africa", 1), "r_europe": ("Europe", 1), "r_north_america": ("North America", -5),
           "r_asia": ("Asia", 8), "r_middle_east": ("Middle East", 3), "r_oceania": ("Oceania", 10), "r_latin_america": ("Latin America", -3)}
-SLOT_HOUR = {7: "morning", 10: "news", 13: "tech", 16: "closing", 19: "evening"}
+SLOT_HOUR = {7: "morning", 10: "news", 12: "jobs", 13: "tech", 16: "closing", 19: "evening"}
 PLAY = "https://play.google.com/store/apps/details?id=com.scholarhub.app"
 
 
@@ -61,7 +62,7 @@ def _sent_ids(topic, slot=None, days=45):
 def _last_source(topic):
     r = SB.table("notif_log").select("item_id,slot").eq("topic", topic).order("sent_at", desc=True).limit(1).execute().data
     if not r: return None
-    for t in ("scholarships", "school_news", "tech_news"):
+    for t in ("scholarships", "school_news", "tech_news", "jobs"):
         x = SB.table(t).select("source").eq("id", r[0]["item_id"]).limit(1).execute().data
         if x: return x[0]["source"]
     return None
@@ -126,11 +127,29 @@ def pick_news(topic, table):
             "data": {"n": f"{table}:{r['id']}", "slot": "news" if table == "school_news" else "tech"}}
 
 
+def pick_job(topic):
+    sent, _ = _sent_ids(topic); today = datetime.now(timezone.utc).date().isoformat()
+    since = (datetime.now(timezone.utc) - timedelta(days=4)).isoformat()
+    rows = SB.table("jobs").select("id,title,summary,source,company,location,kind,deadline,logo,published").gte("published", since) \
+             .or_(f"deadline.is.null,deadline.gte.{today}").order("has_img", desc=True).order("published", desc=True).limit(80).execute().data or []
+    rows = [r for r in rows if r["id"] not in sent and r.get("summary")]
+    pref = [r for r in rows if r.get("kind") in ("graduate", "internship", "ngo", "research")] or rows
+    if not pref: return None
+    r = pref[0]
+    tag = {"internship": "🎒 Internship", "graduate": "🎓 Graduate role", "research": "🔬 Research / Teaching", "ngo": "🤝 NGO job", "remote": "🌍 Remote job"}.get(r.get("kind") or "", "💼 Job")
+    title = f"{tag} · {r.get('company') or r['source']}" + (f" · {r['location']}" if r.get("location") else "")
+    dl = _days_left(r.get("deadline") or "")
+    chip = f"⏳ Closes in {dl} days · " if dl is not None and 0 <= dl <= 14 else (f"📅 Closes {r['deadline']} · " if r.get("deadline") else "")
+    return {"id": r["id"], "title": title, "body": r["title"] + " — " + chip + _snippet(r["summary"], 100), "image": r.get("logo"),
+            "data": {"n": f"jobs:{r['id']}", "slot": "jobs"}}
+
+
 def run_slot(project, token, topic, slot, region):
     item = {"morning": lambda: pick_scholarship(topic, region), "evening": lambda: pick_scholarship(topic, region),
             "closing": lambda: pick_scholarship(topic, region, closing=True) or pick_scholarship(topic, region),
             "news": lambda: pick_news(topic, "school_news") or pick_scholarship(topic, region),
-            "tech": lambda: pick_news(topic, "tech_news") or pick_scholarship(topic, region)}[slot]()
+            "tech": lambda: pick_news(topic, "tech_news") or pick_scholarship(topic, region),
+            "jobs": lambda: pick_job(topic) or pick_scholarship(topic, region)}[slot]()
     if not item: log.info("%s/%s: nothing to send", topic, slot); return False
     ok = _send(project, token, topic, slot, item["title"], item["body"], item.get("image"), {**item["data"], "topic": topic})
     if ok: SB.table("notif_log").insert({"slot": slot, "topic": topic, "item_id": item["id"]}).execute()
