@@ -1,26 +1,125 @@
-<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>ScholarHub</title>
-<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif;text-align:center;padding:20px}
-h1{font-size:34px;margin:10px 0}h1 span{color:#38bdf8}p{color:#94a3b8;max-width:420px;margin:8px auto}.b,.b2{display:block;margin:12px auto;padding:14px 28px;border-radius:12px;background:#38bdf8;color:#0f172a;font-weight:700;text-decoration:none;max-width:300px}.b2{background:#1e293b;color:#e2e8f0}
-.card{background:#1e293b;border:1px solid #273449;border-radius:14px;padding:16px;max-width:420px;margin:16px auto;text-align:left}.card h2{font-size:17px;margin:0 0 6px;line-height:1.35}.dl{font-size:13px;color:#34d399;font-weight:600}.card p{font-size:13px;color:#94a3b8;margin:8px 0 0}</style></head>
-<body><div><div style="font-size:64px">🎓</div><h1>Scholar<span>Hub</span></h1>
-<div id="item"></div>
-<p id="tag">Scholarships, fellowships and grants from universities and governments worldwide — in your pocket.</p>
-<a class=b id="openApp" href="#" style="display:none">Open in the app</a>
-<a class=b2 id="store" href="#">Get it on Google Play</a>
-<p style="font-size:12px"><a href="privacy.html" style="color:#64748b">Privacy policy</a></p></div>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ScholarHub – Scholarships, School News, Tech Updates & Jobs App (Android)</title>
+<meta name="description" content="ScholarHub is a free Android app that finds fully funded scholarships, fellowships and grants worldwide, Nigerian school news (JAMB, WAEC, universities), tech updates and entry-level jobs, internships and NYSC roles – updated twice daily with deadline reminders.">
+<meta name="keywords" content="scholarship app, scholarships for Nigerian students, fully funded scholarships 2026, fully funded scholarships 2027, study abroad scholarships, undergraduate scholarships, masters scholarships, PhD scholarships, JAMB news, WAEC news, school news Nigeria, graduate trainee jobs, internship Nigeria, NYSC jobs, entry level jobs Nigeria, tech news Nigeria">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://faruk-olasco.github.io/ScholarHub/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ScholarHub">
+<meta property="og:title" content="ScholarHub – Scholarships, School News, Tech Updates & Jobs">
+<meta property="og:description" content="Free Android app: fully funded scholarships worldwide, Nigerian school news, tech updates and graduate jobs – updated twice a day with deadline reminders.">
+<meta property="og:url" content="https://faruk-olasco.github.io/ScholarHub/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ScholarHub – Scholarships, School News, Tech Updates & Jobs">
+<meta name="twitter:description" content="Free Android app: fully funded scholarships worldwide, Nigerian school news, tech updates and graduate jobs – updated twice a day.">
+<!-- Google Search Console: paste your verification meta tag on the next line -->
+
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"MobileApplication","name":"ScholarHub","operatingSystem":"Android","applicationCategory":"EducationApplication",
+"description":"Free Android app that finds fully funded scholarships, fellowships and grants worldwide, Nigerian school news, tech updates and entry-level jobs, internships and NYSC roles. Updated twice daily with deadline reminders.",
+"url":"https://faruk-olasco.github.io/ScholarHub/","installUrl":"https://play.google.com/store/apps/details?id=com.scholarhub.app",
+"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Faruk Olasco"},"inLanguage":"en"}
+</script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f8fafc;color:#0f172a;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.55}
+.wrap{max-width:760px;margin:0 auto;padding:28px 18px 60px}
+header{text-align:center;padding:10px 0 6px}.logo{font-size:60px;line-height:1}
+h1{font-size:32px;margin:8px 0 4px}h1 span{color:#0284c7}
+.lead{color:#475569;font-size:17px;max-width:560px;margin:6px auto 18px}
+.btn{display:inline-block;padding:14px 30px;border-radius:12px;background:#0284c7;color:#fff;font-weight:700;text-decoration:none;font-size:16px;box-shadow:0 2px 8px rgba(2,132,199,.3)}
+.btn.alt{background:#fff;color:#0f172a;border:1px solid #e2e8f0;box-shadow:none;margin-top:10px}
+.note{font-size:13px;color:#64748b;margin-top:10px}
+section{margin-top:34px}h2{font-size:22px;margin:0 0 10px;border-left:4px solid #0284c7;padding-left:10px}
+h3{font-size:17px;margin:0 0 6px}
+p{margin:8px 0;color:#334155}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:560px){.grid{grid-template-columns:1fr}}
+.feat{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
+.feat .ic{font-size:26px}.feat p{font-size:14px}
+ul{padding-left:20px;color:#334155}li{margin:4px 0}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin:16px auto;text-align:left;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+.card h2{font-size:17px;margin:0 0 6px;line-height:1.35;border:0;padding:0}.dl{font-size:13px;color:#047857;font-weight:600}.card p{font-size:14px}
+.faq .feat{margin-bottom:10px}
+footer{margin-top:40px;text-align:center;font-size:13px;color:#64748b}footer a{color:#0369a1}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="logo">🎓</div>
+  <h1>Scholar<span>Hub</span></h1>
+  <div id="item"></div>
+  <p class="lead" id="tag">Fully funded scholarships worldwide, Nigerian school news, tech updates and graduate jobs — all in one free Android app, updated twice a day.</p>
+  <a class="btn" id="openApp" href="#" style="display:none">Open in the app</a>
+  <a class="btn" id="store" href="https://play.google.com/store/apps/details?id=com.scholarhub.app" rel="noopener">Get it free on Google Play</a>
+  <div class="note">Free • No sign-up • Android 7.0 and above</div>
+</header>
+
+<section>
+  <h2>What is ScholarHub?</h2>
+  <p>ScholarHub is a free scholarship app for students in Nigeria, Africa and around the world. It automatically searches hundreds of university, government, embassy and foundation websites twice every day and brings you <strong>fully funded scholarships</strong>, fellowships, grants, exchange programmes and summer schools for undergraduate, master's, PhD and postdoctoral study. Every listing shows the application deadline, funding type, level of study and the official link to apply.</p>
+  <p>Beyond scholarships, the app keeps you informed with <strong>school news</strong> (JAMB, WAEC, NECO, NUC and Nigerian universities and polytechnics), daily <strong>tech updates</strong>, and <strong>entry-level jobs</strong> — graduate trainee programmes, internships, NYSC placements, NGO and remote roles.</p>
+</section>
+
+<section>
+  <h2>Inside the app</h2>
+  <div class="grid">
+    <div class="feat"><div class="ic">🎓</div><h3>Scholarships</h3><p>Undergraduate, master's, PhD, fellowships and grants from universities and governments worldwide. Filter by country, region, level, funding and deadline. Search by keyword.</p></div>
+    <div class="feat"><div class="ic">🏫</div><h3>School News Update</h3><p>JAMB, WAEC, NECO and university announcements: admission lists, post-UTME, resumption dates, fees, convocation and strike updates — genuinely new posts only.</p></div>
+    <div class="feat"><div class="ic">💻</div><h3>Tech Updates</h3><p>AI, smartphones, robotics, startup funding and government tech investments from Nigerian, African and global tech outlets.</p></div>
+    <div class="feat"><div class="ic">💼</div><h3>Jobs</h3><p>Entry-level and graduate jobs, internships, NYSC roles, NGO, research and remote positions — with closing dates and a direct "Apply on site" link.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>Why students choose ScholarHub</h2>
+  <ul>
+    <li><strong>Updated twice daily</strong> — new opportunities appear automatically; expired ones are removed.</li>
+    <li><strong>Deadline reminders</strong> — get a notification 14 days before a saved scholarship closes.</li>
+    <li><strong>Daily notifications</strong> — the best new scholarship, school news, job and tech story each day, in your local time.</li>
+    <li><strong>Save, notes and plan</strong> — bookmark any item with ★, add private notes and build your application plan.</li>
+    <li><strong>Official links only</strong> — every card opens the original listing; no fake "apply here" pages.</li>
+    <li><strong>Share cards</strong> — share any scholarship or job as a neat image to WhatsApp, Telegram or X.</li>
+    <li><strong>100% free</strong> — no account, no subscription.</li>
+  </ul>
+</section>
+
+<section class="faq">
+  <h2>Frequently asked questions</h2>
+  <div class="feat"><h3>Is ScholarHub free?</h3><p>Yes. The app is completely free to download and use and is supported by small ads.</p></div>
+  <div class="feat"><h3>Which scholarships does it cover?</h3><p>Fully funded and partially funded scholarships for international students in the UK, USA, Canada, Germany, Netherlands, Sweden, Japan, China, Australia, Turkey and many more, plus Nigerian scholarships such as PTDF, NNPC, Shell, MTN and state bursaries when they open.</p></div>
+  <div class="feat"><h3>What if a scholarship has no deadline shown?</h3><p>It means the official page has not stated one. The listing is treated as open until the source removes it.</p></div>
+  <div class="feat"><h3>Does it work outside Nigeria?</h3><p>Yes. Scholarships are worldwide and you can filter by region or country. School news and most jobs focus on Nigeria, with remote and international graduate programmes included.</p></div>
+  <div class="feat"><h3>Is it on iPhone?</h3><p>Not yet — ScholarHub is currently available for Android on Google Play.</p></div>
+</section>
+
+<section style="text-align:center">
+  <a class="btn" href="https://play.google.com/store/apps/details?id=com.scholarhub.app" rel="noopener">Download ScholarHub on Google Play</a>
+</section>
+
+<footer>
+  <p><a href="privacy.html">Privacy policy</a> · Contact: francoprinciple1@gmail.com</p>
+  <p>© <span id="yr"></span> ScholarHub. Google Play is a trademark of Google LLC.</p>
+</footer>
+</div>
 <script>
-const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.scholarhub.app";
-const store = document.getElementById("store");
-if (PLAY_STORE_URL) store.href = PLAY_STORE_URL; else { store.textContent = "Google Play — coming soon"; store.style.opacity = ".6"; }
+document.getElementById("yr").textContent = new Date().getFullYear();
 const SUPABASE_URL = "https://bmoicxrcyxbssgkfzahu.supabase.co", SUPABASE_ANON_KEY = "sb_publishable_qI60qVcNwEW6DUN4Bdztjw_lJaeuijY";
 const id = new URLSearchParams(location.search).get("s");
 const esc = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 if (id) {
-  const a = document.getElementById("openApp"); a.style.display = "block"; a.href = "scholarhub://open?s=" + encodeURIComponent(id);
+  // 1) hand off to the installed app via custom scheme (works even before Android verifies the https link)
+  const a = document.getElementById("openApp"); a.style.display = "inline-block"; a.href = "scholarhub://open?s=" + encodeURIComponent(id);
   setTimeout(() => { location.href = a.href; }, 400);
+  // 2) preview of the scholarship for people who don't have the app
   fetch(SUPABASE_URL + "/rest/v1/scholarships?select=title,summary,deadline,url,source&id=eq." + encodeURIComponent(id), { headers: { apikey: SUPABASE_ANON_KEY } })
     .then((r) => r.json()).then((rows) => { const i = rows[0]; if (!i) return;
       document.getElementById("tag").textContent = "Shared from the ScholarHub app";
-      document.getElementById("item").innerHTML = `<div class="card"><h2>${esc(i.title)}</h2><div class="dl">${i.deadline ? "⏰ Deadline " + esc(i.deadline) : "🟢 Open — no deadline stated"}</div><p>${esc((i.summary || "").slice(0, 300))}</p><p><a href="${esc(i.url)}" style="color:#38bdf8">View original listing ↗</a></p></div>`; }).catch(() => {});
+      document.getElementById("item").innerHTML = `<div class="card"><h2>${esc(i.title)}</h2><div class="dl">${i.deadline ? "⏰ Deadline " + esc(i.deadline) : "🟢 Open — no deadline stated"}</div><p>${esc((i.summary || "").slice(0, 300))}</p><p><a href="${esc(i.url)}" style="color:#0369a1">View original listing ↗</a></p></div>`; }).catch(() => {});
 }
-</script></body></html>
+</script>
+</body>
+</html>
