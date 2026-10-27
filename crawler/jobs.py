@@ -5,6 +5,13 @@ Completely separate from the scholarship and news crawlers: writes ONLY to the `
 
 What it does, twice a day (called by .github/workflows/crawl.yml after news.py):
   1. reads public job-board feeds (Nigeria + remote + international graduate programmes)
+  1b. EMPLOYER WATCH LIST (table `job_sources`, managed from Supabase – one row per university/employer):
+      - WordPress sites: asks the site's own search for recruitment / vacancies / employment and keeps dated,
+        vacancy-looking posts from the last 60 days (OAU, ABU, Unilorin, UNIPORT, ABUAD, NIMR, IITA, …)
+      - plain careers/vacancies pages: keeps the vacancy links on that page (UI, FUNAAB, African Union, …)
+      - a direct RSS feed url also works
+      These land in Jobs as tier 'official' with the institution as company; no entry-level filter is applied
+      (Lecturer, Technologist, Registrar … all welcome). Add an employer = add one row, no code change.
   2. keeps only the kinds of roles students/graduates want (WANT) and drops noise (drivers, sales agents,
      "(N positions)" roundups, …)
   3. de-duplicates by title+company and by URL
@@ -75,6 +82,113 @@ KIND_RULES = [("internship", r"\bintern(ship)?s?\b|\bnysc\b|\bsiwes\b|industrial
               ("research", r"fellow|research|lecturer|teaching|teacher|tutor|academic|postdoc"),
               ("ngo", r"volunteer|ngo|foundation|initiative|unicef|undp|who\b|save the children|red cross|msf|chai\b|consortium|relief|humanitarian|non[- ]profit|charity"),
               ("remote", r"remote|work from home|anywhere")]
+
+# ---------------------------------------------------------------------------------------------
+# Employer watch list (table job_sources: name, url, type auto|page|feed, location, logo, active)
+# ---------------------------------------------------------------------------------------------
+OFFICIAL_MAX_AGE = 60       # an institution's advert older than this is treated as closed
+SEARCH_WORDS = ["recruitment", "vacancies", "vacancy", "employment"]
+OFFICIAL_WANT = re.compile(r"recruit|vacanc|advertis\w*\s+(for|of)|post(s)? of|applications? (are |is )?invited|employment opportunit|"
+                           r"job (opening|vacanc|opportunit|advert|offer)|openings?\b|hiring|now recruiting|internship (programme|program|opportunit|position)|"
+                           r"graduate trainee|trainee programme|lecturer|professor|technologist|bursar|registrar|librarian|research (assistant|officer|fellow)|wanted", re.I)
+# links on a static careers page have no date, so they must carry an explicit "we are recruiting" word (a role word alone = a staff list)
+PAGE_WANT = re.compile(r"recruit|vacanc|advertis\w*\s+(for|of)|post(s)? of|applications? (are |is )?invited|employment opportunit|"
+                       r"job (opening|vacanc|opportunit|advert|offer)|openings?\b|hiring|internship (programme|program|opportunit|position)|graduate trainee", re.I)
+OFFICIAL_SKIP = re.compile(r"screening|shortlist|scam|beware|fake|\bcbt\b|test schedule|aptitude test|results?\b|interview|invited applicants|"
+                           r"mop[- ]up|congrat|privacy|policy|strateg|statistic|newsletter|accreditation|seminar|licen[cs]e|workshop|conference|"
+                           r"\blectures?\b|inaugural|admission|matriculation|convocation|appointed|appoints|appointment of|inaugurat|visit|\bwins?\b|"
+                           r"award|budget|partnership|celebrat|principal officers|tender|expression of interest|\breoi\b|consultan|procurement|\bbid|"
+                           r"portal (is )?closed|closed\b|extension of|postpone|disclaimer|press release|our positions|^careers?$|^recruitment$|^vacanc(y|ies)$", re.I)
+
+
+def load_sources():
+    try:
+        return SB.table("job_sources").select("*").eq("active", True).execute().data or []
+    except Exception as e:
+        log.warning("job_sources table not readable (run the SQL once): %s", e); return []
+
+
+def official_row(s, title, link, pub, summ="", strict=False):
+    title = clean(title)
+    title = re.sub(r"\s*[-–|]\s*(" + re.escape(s["name"][:12]) + r"|home|news|welcome).*$", "", title, flags=re.I).strip() or title
+    if not (10 <= len(title) <= 180) or not OFFICIAL_WANT.search(title) or OFFICIAL_SKIP.search(title): return None
+    if strict and not PAGE_WANT.search(title): return None
+    if re.match(r"https?://|www\.", title, re.I): return None     # anchor text that is just a web address
+    if not link.startswith("http") or re.search(r"\.(jpe?g|png|gif|webp)(\?|$)", link, re.I): return None
+    text = title + " " + (summ or "")[:400]
+    return {"id": jid(link), "title": title[:160], "summary": clean(summ)[:600], "url": link, "source": s["name"], "tier": "official",
+            "company": s["name"][:100], "location": (s.get("location") or "Nigeria")[:40], "kind": kind_of(text),
+            "deadline": None, "published": pub.isoformat(), "industry": "Education" if re.search(r"universit|polytechnic|college|institute", s["name"], re.I) else None,
+            "_logo": s.get("logo") or None}
+
+
+def _rss(url):
+    try:
+        r = get(url)
+        if re.search(rb"<(rss|feed)\b", r.content[:4000]): return feedparser.parse(r.content)
+    except Exception:
+        pass
+    return None
+
+
+def from_wp_search(s):
+    """WordPress site: /search/<word>/feed/rss2/ (or ?s=<word>&feed=rss2). Returns (rows, feed_worked)."""
+    out, seen, worked = [], set(), False
+    root = s["url"].rstrip("/")
+    for kw in SEARCH_WORDS:
+        f = _rss(f"{root}/search/{kw}/feed/rss2/") or _rss(f"{root}/?s={kw}&feed=rss2")
+        if not f: continue
+        worked = True
+        for e in f.entries[:40]:
+            link = (e.get("link") or "").strip().split("#")[0]
+            if not link or link in seen: continue
+            seen.add(link)
+            try: pub = datetime(*e.published_parsed[:6], tzinfo=UTC)
+            except Exception: continue      # undated = a static page (e.g. "Registry") – can't tell if it is current, skip
+            if pub < datetime.now(UTC) - timedelta(days=OFFICIAL_MAX_AGE): continue
+            row = official_row(s, e.get("title"), link, pub, clean(e.get("summary") or ""))
+            if row: out.append(row)
+    return out, worked
+
+
+def from_page(s):
+    """A careers/vacancies page: every vacancy-looking link on it; if none, the page itself when its title is an advert."""
+    out, ids = [], set()
+    try:
+        h = get(s["url"]).text
+    except Exception as e:
+        log.warning("%s: page failed: %s", s["name"], e); return out
+    from urllib.parse import urljoin
+    soup = BeautifulSoup(h, "html.parser"); now = datetime.now(UTC)
+    for a in soup.find_all("a", href=True):
+        t = clean(a.get_text(" "))
+        link = urljoin(s["url"], a["href"]).split("#")[0]
+        if link.rstrip("/") == s["url"].rstrip("/") or a["href"].startswith(("#", "javascript", "mailto")): continue
+        row = official_row(s, t, link, now, "", strict=True)
+        if row and row["id"] not in ids: ids.add(row["id"]); out.append(row)
+    if soup.title and soup.title.string:          # the page itself may be the advert (funaab.edu.ng/recruitment = "Staff Recruitment – 2025")
+        row = official_row(s, soup.title.string, s["url"], now, "", strict=True)
+        if row and row["id"] not in ids: out.insert(0, row)
+    return out[:30]
+
+
+def from_source(s):
+    kind = (s.get("type") or "auto").lower()
+    try:
+        if kind == "feed" or re.search(r"/feed/?$|\.(rss|xml)$|feed=rss", s["url"]):
+            f = _rss(s["url"]); out = []
+            for e in (f.entries if f else [])[:60]:
+                try: pub = datetime(*e.published_parsed[:6], tzinfo=UTC)
+                except Exception: pub = datetime.now(UTC)
+                if pub < datetime.now(UTC) - timedelta(days=OFFICIAL_MAX_AGE): continue
+                row = official_row(s, e.get("title"), (e.get("link") or "").strip(), pub, clean(e.get("summary") or ""))
+                if row: out.append(row)
+            return out
+        if kind == "page": return from_page(s)
+        rows, worked = from_wp_search(s)
+        return rows if worked else from_page(s)
+    except Exception as e:
+        log.warning("%s: %s", s.get("name"), e); return []
 
 
 def clean(t):
@@ -207,6 +321,13 @@ def page_details(url):
     if not out.get("deadline"):
         m = re.search(r"(?:Application )?(?:Closing Date|Deadline|Application Deadline)[^<]{0,20}(?:<[^>]+>\s*){0,4}([^<]{4,60})", h, re.I)
         if m: out["deadline"] = parse_day(m.group(1))
+    # 2b) Nigerian institutions: "not later than six (6) weeks from the date of this advertisement" -> counted from the publish date
+    if not out.get("deadline"):
+        txt = clean(re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", h, flags=re.S | re.I))
+        m = re.search(r"(?:within|not later than|closes? (?:in|within)|on or before|latest)\s+(?:a period of\s+)?(one|two|three|four|five|six|seven|eight|nine|ten|twelve|\d{1,2})\s*(?:\(\d+\)\s*)?(weeks?|days?|months?)\s+(?:from|of|after)", txt, re.I)
+        if m:
+            n = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "twelve": 12}.get(m.group(1).lower()) or int(m.group(1))
+            out["deadline_days"] = n * (7 if m.group(2).lower().startswith("w") else 30 if m.group(2).lower().startswith("m") else 1)
     # 3) employer logo shown on the page (never the board's own branding)
     if not out.get("logo"):
         soup = BeautifulSoup(h, "html.parser")
@@ -223,9 +344,12 @@ def page_details(url):
 def finish_row(r):
     """Opens the job page for a new row, then looks for the employer's real logo."""
     d = page_details(r["url"])
+    if not d.get("deadline") and d.get("deadline_days") and not r.get("deadline"):
+        try: r["deadline"] = (dparser.parse(r["published"]).date() + timedelta(days=d["deadline_days"])).isoformat()   # may already be past -> hidden & purged
+        except Exception: pass
     for k in ("deadline", "company", "location", "summary"):
         if d.get(k) and (not r.get(k) or k == "deadline"): r[k] = d[k]
-    logo = d.get("logo")
+    logo = r.pop("_logo", None) or d.get("logo")
     if not logo and r.get("company"):
         try:
             _, logo = media.logo_for(org_name=r["company"], SB=SB)
@@ -244,6 +368,13 @@ def main():
         for fut in as_completed([ex.submit(from_feed, n, u, k) for n, u, k in FEEDS]):
             got = fut.result(); rows.extend(got)
             if got: log.info("%-26s %3d kept", got[0]["source"], len(got))
+    # employer watch list (official adverts straight from the institution's own website)
+    sources = load_sources()
+    if sources:
+        with ThreadPoolExecutor(6) as ex:
+            for src, got in zip(sources, ex.map(from_source, sources)):
+                rows.extend(got)
+                if got: log.info("%-26s %3d kept (official)", src["name"][:26], len(got))
     # de-dupe: same URL, or same role+company (boards repost each other)
     by_id, seen_key = {}, set()
     for r in sorted(rows, key=lambda r: r["published"], reverse=True):
@@ -263,7 +394,7 @@ def main():
     with ThreadPoolExecutor(6) as ex:
         list(ex.map(finish_row, todo))
     now = datetime.now(UTC).isoformat()
-    for r in new_rows: r["first_seen"] = now; r["last_seen"] = now
+    for r in new_rows: r["first_seen"] = now; r["last_seen"] = now; r.pop("_logo", None)
     # PostgREST needs identical keys per batch -> group by key-set
     groups = {}
     for r in new_rows: groups.setdefault(tuple(sorted(r.keys())), []).append(r)
@@ -273,6 +404,7 @@ def main():
     for r in old_rows:
         upd = {"last_seen": now}
         if r.get("deadline"): upd["deadline"] = r["deadline"]
+        if r.get("tier") == "official": upd["title"] = r["title"]   # e.g. a vacancies page whose heading changed to the new year
         try: SB.table("jobs").update(upd).eq("id", r["id"]).execute()
         except Exception: pass
     # rows inserted earlier without a page visit (over the per-run budget): finish a batch now
@@ -288,7 +420,8 @@ def main():
     # expiry: day after the closing date; or 30 days after posting when no closing date is stated
     today = datetime.now(UTC).date()
     SB.table("jobs").delete().lt("deadline", (today - timedelta(days=1)).isoformat()).execute()
-    SB.table("jobs").delete().is_("deadline", "null").lt("published", (datetime.now(UTC) - timedelta(days=KEEP_UNDATED_DAYS)).isoformat()).execute()
+    SB.table("jobs").delete().is_("deadline", "null").neq("tier", "official").lt("published", (datetime.now(UTC) - timedelta(days=KEEP_UNDATED_DAYS)).isoformat()).execute()
+    SB.table("jobs").delete().is_("deadline", "null").eq("tier", "official").lt("published", (datetime.now(UTC) - timedelta(days=OFFICIAL_MAX_AGE)).isoformat()).execute()
     with_logo = sum(1 for r in todo if r.get("logo")); with_dl = sum(1 for r in todo if r.get("deadline"))
     log.info("jobs: %d kept, %d new (%d pages opened: %d with logo, %d with closing date) in %.0fs", len(rows), len(new_rows), len(todo), with_logo, with_dl, time.time() - t0)
 
