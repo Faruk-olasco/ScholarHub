@@ -170,11 +170,14 @@ async function applyDailyPush() {
 async function scheduleDeadline(i) {
   if (!isNative || !LocalNotif || !notif.deadlines || !i.deadline) return;
   const dl = new Date(i.deadline + "T09:00:00"); const list = [];
+  const word = i._sec === "jobs" ? "Closes" : "Deadline", nice = dl.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", year: "numeric" });
   for (let d = 14; d >= 0; d--) { // one reminder every morning for the last 14 days, counting down
     const at = new Date(dl.getTime() - d * 864e5);
     if (at <= new Date()) continue;
-    const title = d === 0 ? "⏰ Deadline is TODAY" : d === 1 ? "⏰ Deadline is tomorrow" : `⏰ ${d} days left`;
-    list.push({ id: nid(i.id, d), title, body: i.title.slice(0, 90), schedule: { at, allowWhileIdle: true }, extra: { s: i.id }, smallIcon: "ic_stat_push", channelId: "scholarhub_deadlines" });
+    const left = d === 0 ? `${word} TODAY` : d === 1 ? `${word} tomorrow` : `${d} days left`;
+    list.push({ id: nid(i.id, d), title: `⏰ ${left} · ${i.title.slice(0, 60)}`, body: `${word} ${nice} — ${i.title.slice(0, 120)}`,
+      largeBody: `${i.title}\n${word}: ${nice}. Tap to open the card, apply or add a note.`, summaryText: "ScholarHub · Deadline reminder",
+      schedule: { at, allowWhileIdle: true }, extra: { s: i.id }, smallIcon: "ic_stat_push", channelId: "scholarhub_deadlines" });
   }
   if (list.length) { try { await LocalNotif.schedule({ notifications: list }); } catch (e) { console.warn("schedule", e); } }
 }
@@ -221,16 +224,19 @@ async function initAds() {
 }
 // ---- Native (in-feed) ads: real ad cards between scholarship cards, rendered by the Google SDK ----
 let nativeFeed = null;
+// same look as our cards: white, 14px corners, thin border, bold dark title, grey body, blue button
+const AD_CARD_STYLE = { backgroundColor: "#ffffff", cornerRadius: 14, borderColor: "#e2e8f0", borderWidth: 1, headlineColor: "#0f172a", headlineFontSize: 15, bodyColor: "#334155", bodyFontSize: 13, callToActionBackgroundColor: "#0284c7", callToActionTextColor: "#ffffff" };
+function collapseAdSlot(ev) { const el = document.querySelector(`capacitor-admob-native[slot-key="${ev.slotKey}"]`); if (el && el.parentElement) el.parentElement.style.display = "none"; }
 const AdMobJS = window.capacitorStripe || window.capacitorAdMob; // JS helpers bundled from the plugin (vendor/admob.js)
 async function initNativeAds() {
   if (!isNative || !AdMobJS || !AdMobJS.NativeAdFeed || !(window.ADMOB.nativeId || window.ADMOB.testing)) return;
   try {
     nativeFeed = await AdMobJS.NativeAdFeed.create({
       feedId: "list", adId: window.ADMOB.nativeId, isTesting: window.ADMOB.testing, template: AdMobJS.NativeAdTemplate.Medium,
-      style: { backgroundColor: "#ffffff", cornerRadius: 14, headlineColor: "#0f172a", bodyColor: "#334155", callToActionBackgroundColor: "#0284c7", callToActionTextColor: "#ffffff" },
+      style: AD_CARD_STYLE,
     });
     // if an ad can't be filled, collapse its slot so there is no empty box in the list
-    try { nativeFeed.addListener(AdMobJS.NativeAdPluginEvents.FailedToLoad, (ev) => { const el = document.querySelector(`capacitor-admob-native[slot-key="${ev.slotKey}"]`); if (el && el.parentElement) el.parentElement.style.display = "none"; }); } catch (e) {}
+    try { nativeFeed.addListener(AdMobJS.NativeAdPluginEvents.FailedToLoad, collapseAdSlot); } catch (e) {}
     // native ads float above the page – hide them whenever a sheet (detail/filters/alerts/admin) is open
     const sheets = document.querySelectorAll(".sheet");
     let paused = false;
@@ -239,8 +245,27 @@ async function initNativeAds() {
     document.addEventListener("visibilitychange", sync);
     if (state.items.length) { if (isNewsTab()) renderNews(); else render(); } // slots become live
   } catch (e) { console.warn("native ads", e); nativeFeed = null; }
+  initDetailAd();
 }
 const nativeSlot = (i) => (nativeFeed ? `<div class="card ad-slot"><capacitor-admob-native feed-id="list" slot-key="ad-${esc(i.id)}" style="display:block;height:300px"></capacitor-admob-native></div>` : "");
+// ---- One ad inside the detail sheet (under the description, above the Apply button). Separate feed so it is not paused with the list ads.
+let detailFeed = null;
+async function initDetailAd() {
+  if (!isNative || !AdMobJS || !AdMobJS.NativeAdFeed || !(window.ADMOB.nativeId || window.ADMOB.testing)) return;
+  try {
+    detailFeed = await AdMobJS.NativeAdFeed.create({ feedId: "detail", adId: window.ADMOB.nativeId, isTesting: window.ADMOB.testing, template: AdMobJS.NativeAdTemplate.Medium, style: AD_CARD_STYLE });
+    try { detailFeed.addListener(AdMobJS.NativeAdPluginEvents.FailedToLoad, collapseAdSlot); } catch (e) {}
+    // hide it when another sheet (filters/alerts/admin) is opened on top of the detail, or the app goes to background
+    const others = [...document.querySelectorAll(".sheet")].filter((x) => x.id !== "detail");
+    let paused = false;
+    const sync = async () => {
+      if ($("#detail").classList.contains("hidden")) document.querySelectorAll('capacitor-admob-native[feed-id="detail"]').forEach((el) => el.parentElement && el.parentElement.remove()); // sheet closed -> drop the ad
+      const cover = document.hidden || others.some((x) => !x.classList.contains("hidden")); if (cover && !paused) { paused = true; try { await detailFeed.pause(); } catch (e) {} } else if (!cover && paused) { paused = false; try { detailFeed.resume(); } catch (e) {} } };
+    new MutationObserver(sync).observe(document.body, { attributes: true, subtree: true, attributeFilter: ["class"] });
+    document.addEventListener("visibilitychange", sync);
+  } catch (e) { console.warn("detail ad", e); detailFeed = null; }
+}
+const detailSlot = (i) => (detailFeed ? `<div class="card ad-slot" style="margin:14px 0"><capacitor-admob-native feed-id="detail" slot-key="d-${esc(i.id)}" style="display:block;height:300px"></capacitor-admob-native></div>` : "");
 // ---- App Open ad: cold launch (behind a short branded loading screen) + when the user comes back to the app ----
 function initAppOpen() {
   const load = AdMob && (AdMob.loadAppOpen || AdMob.prepareAppOpen); // plugin v8 = loadAppOpen
@@ -405,6 +430,7 @@ function openNewsDetail(i) {
     ${sec === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">🟢 Open — apply now (no closing date stated)</div>') : ""}
     <p>${esc(i.summary || (sec === "jobs" ? "Open the listing for the full description and how to apply." : "Open the full article to read more."))}</p>
     <div class="muted" style="margin-top:6px;font-size:12px">${sec === "jobs" ? "ℹ️ Independent app – we list jobs from public job boards and never charge for applications. Beware of anyone asking for money to process a job. Apply only on the employer's or job board's page below." : `ℹ️ Summary collected automatically from ${esc(host || i.source)}. Read the full article on the source website.`}</div>
+    ${detailSlot(i)}
     <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#0369a1">${esc(i.url)}</a></div>
     <div class="actions">
       <button class="ghost" id="nSave">${saved.has(i.id) ? "★ Saved" : "☆ Save"}</button>
@@ -628,6 +654,7 @@ function openDetail(i) {
     <p>${esc(i.summary)}</p>
     <div class="muted">Source: ${esc(i.source)}${i.tier === "official" ? " (provider's own website)" : ""}</div>
     <div class="muted" style="margin-top:6px;font-size:12px">ℹ️ Independent app – not affiliated with any government, university or provider. Verify all details and apply only on the official page below.</div>
+    ${detailSlot(i)}
     <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#0369a1">${esc(i.url)}</a></div>
     <div class="actions">
       <button class="ghost" id="dSave">${saved.has(i.id) ? "★ Saved" : "☆ Save"}</button>
