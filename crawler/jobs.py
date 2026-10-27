@@ -10,6 +10,9 @@ What it does, twice a day (called by .github/workflows/crawl.yml after news.py):
         vacancy-looking posts from the last 60 days (OAU, ABU, Unilorin, UNIPORT, ABUAD, NIMR, IITA, …)
       - plain careers/vacancies pages: keeps the vacancy links on that page (UI, FUNAAB, African Union, …)
       - a direct RSS feed url also works
+      - company hiring portals with an open job list: type greenhouse / workable / ashby / smartrecruiters / lever
+        (url = the company's portal name, e.g. moniepoint) and type workday (url = the Workday careers page);
+        type oau-portal reads OAU's own application portal (apply.oauife.edu.ng), one card per role
       These land in Jobs as tier 'official' with the institution as company; no entry-level filter is applied
       (Lecturer, Technologist, Registrar … all welcome). Add an employer = add one row, no code change.
   2. keeps only the kinds of roles students/graduates want (WANT) and drops noise (drivers, sales agents,
@@ -172,9 +175,109 @@ def from_page(s):
     return out[:30]
 
 
+# ---- company hiring portals (ATS) with an open job list -------------------------------------
+NG_PLACES = re.compile(r"\b(nigeria|lagos|abuja|fct|ibadan|port[- ]harcourt|kano|kaduna|enugu|aba|benin|ilorin|jos|abeokuta|owerri|uyo|calabar|warri|onitsha|"
+                       r"abia|adamawa|akwa ibom|anambra|bauchi|bayelsa|benue|borno|cross river|delta|ebonyi|edo|ekiti|gombe|imo|jigawa|katsina|kebbi|kogi|kwara|"
+                       r"nasarawa|niger|ogun|ondo|osun|oyo|plateau|rivers|sokoto|taraba|yobe|zamfara|"
+                       r"remote|anywhere|work from home|africa|global|worldwide|ghana|kenya|rwanda|south africa)\b", re.I)
+SENIOR = re.compile(r"\b(senior|staff|sr\.?|head|director|chief|vp|principal|lead|executive|manager|partner|architect)\b", re.I)
+JSON_UA = {**UA, "Accept": "application/json"}
+
+
+def _days_ago(txt):
+    """Workday's 'Posted 8 Days Ago' / 'Posted Today' / 'Posted 30+ Days Ago' -> datetime."""
+    m = re.search(r"(\d+)\+?\s*day", txt or "", re.I)
+    d = int(m.group(1)) if m else (1 if re.search(r"yesterday", txt or "", re.I) else 0)
+    return datetime.now(UTC) - timedelta(days=d)
+
+
+def ats_row(s, title, link, pub, loc, summ="", dept="", remote=False):
+    title = clean(title); loc = clean(loc or "")
+    if not title or not link or NOISE.search(title) or SENIOR.search(title): return None
+    if not WANT.search(title + " " + dept): return None                       # same student/graduate focus as the job boards
+    if not (remote or NG_PLACES.search(loc) or (not loc and NG_PLACES.search(s.get("location") or ""))): return None   # a foreign office never passes
+    if pub < datetime.now(UTC) - timedelta(days=OFFICIAL_MAX_AGE): return None
+    text = title + " " + dept + " " + (summ or "")[:300]
+    return {"id": jid(link), "title": title[:160], "summary": clean(summ)[:600] or f"{title} at {s['name']}" + (f" – {dept}" if dept else "") + (f" ({loc})" if loc else "") + ". Open the listing for the full description and apply on the company's portal.",
+            "url": link, "source": s["name"], "tier": "official", "company": s["name"][:100],
+            "location": ("Remote" if remote or re.search(r"remote|anywhere", loc, re.I) else (loc.split(",")[0].strip() or s.get("location") or "Nigeria"))[:40],
+            "kind": kind_of(text), "deadline": None, "published": pub.isoformat(), "industry": clean(dept)[:60] or None, "_logo": s.get("logo") or None}
+
+
+def from_ats(s, kind):
+    acct = s["url"].strip().rstrip("/").split("/")[-1] if "/" in s["url"] and kind != "workday" else s["url"].strip()
+    out = []
+    if kind == "greenhouse":
+        for j in requests.get(f"https://boards-api.greenhouse.io/v1/boards/{acct}/jobs", headers=JSON_UA, timeout=(8, 25)).json().get("jobs", []):
+            pub = dparser.parse(j.get("first_published") or j.get("updated_at")).astimezone(UTC)
+            r = ats_row(s, j.get("title"), j.get("absolute_url"), pub, (j.get("location") or {}).get("name"), "", ", ".join(d["name"] for d in j.get("departments", []) if d.get("name")))
+            if r:
+                if j.get("application_deadline"): r["deadline"] = parse_day(j["application_deadline"][:10])
+                out.append(r)
+    elif kind == "workable":
+        for j in requests.get(f"https://apply.workable.com/api/v1/widget/accounts/{acct}", headers=JSON_UA, timeout=(8, 25)).json().get("jobs", []):
+            pub = dparser.parse(j.get("published_on") or j.get("created_at")).replace(tzinfo=UTC)
+            r = ats_row(s, j.get("title"), j.get("url"), pub, ", ".join(x for x in (j.get("city"), j.get("country")) if x), "", j.get("department") or "", remote=str(j.get("telecommuting")).lower() == "true")
+            if r: out.append(r)
+    elif kind == "ashby":
+        for j in requests.get(f"https://api.ashbyhq.com/posting-api/job-board/{acct}", headers=JSON_UA, timeout=(8, 25)).json().get("jobs", []):
+            if j.get("isListed") is False: continue
+            pub = dparser.parse(j.get("publishedAt")).astimezone(UTC)
+            r = ats_row(s, j.get("title"), j.get("jobUrl"), pub, j.get("location"), (j.get("descriptionPlain") or "")[:600], j.get("department") or "", remote=bool(j.get("isRemote")))
+            if r: out.append(r)
+    elif kind == "smartrecruiters":
+        for j in requests.get(f"https://api.smartrecruiters.com/v1/companies/{acct}/postings?limit=100", headers=JSON_UA, timeout=(8, 25)).json().get("content", []):
+            pub = dparser.parse(j.get("releasedDate")).astimezone(UTC); loc = j.get("location") or {}
+            r = ats_row(s, j.get("name"), f"https://jobs.smartrecruiters.com/{acct}/{j.get('id')}", pub, ", ".join(x for x in (loc.get("city"), loc.get("country")) if x), "", (j.get("department") or {}).get("label", ""), remote=bool(loc.get("remote")))
+            if r: out.append(r)
+    elif kind == "lever":
+        for j in requests.get(f"https://api.lever.co/v0/postings/{acct}?mode=json", headers=JSON_UA, timeout=(8, 25)).json():
+            pub = datetime.fromtimestamp(int(j.get("createdAt", 0)) / 1000, UTC); cat = j.get("categories") or {}
+            r = ats_row(s, j.get("text"), j.get("hostedUrl"), pub, cat.get("location"), (j.get("descriptionPlain") or "")[:600], cat.get("team") or cat.get("department") or "", remote=str(j.get("workplaceType")).lower() == "remote")
+            if r: out.append(r)
+    elif kind == "workday":   # url like https://pzcussons.wd3.myworkdayjobs.com/CareersPZCussons
+        u = urlparse(s["url"]); tenant = u.netloc.split(".")[0]; site = u.path.strip("/").split("/")[0]
+        api = f"https://{u.netloc}/wday/cxs/{tenant}/{site}/jobs"
+        for off in (0, 20, 40, 60, 80):
+            d = requests.post(api, headers={**JSON_UA, "Content-Type": "application/json"}, json={"appliedFacets": {}, "limit": 20, "offset": off, "searchText": ""}, timeout=(8, 25)).json()
+            posts = d.get("jobPostings") or []
+            for j in posts:
+                r = ats_row(s, j.get("title"), f"https://{u.netloc}/{site}{j.get('externalPath', '')}", _days_ago(j.get("postedOn")), j.get("locationsText"))
+                if r: out.append(r)
+            if len(posts) < 20 or off + 20 >= int(d.get("total") or 0): break
+    elif kind == "oau-portal":   # OAU's own application portal: hidden list behind the React app; one card per staff category
+        api = s["url"] if "apply-api" in s["url"] else "https://apply-api.oauife.edu.ng/api/v1/app/job-positions"
+        data = [x for x in requests.get(api, headers=JSON_UA, timeout=(8, 25)).json().get("data", []) if x.get("is_active")]
+        cats = {}
+        for x in data: cats.setdefault((x.get("employment_category") or "Other").strip().title(), []).append(x)
+        for cat, xs in cats.items():
+            roles = {}
+            for x in xs: roles[re.sub(r"\s*\(.*?\)\s*", " ", x.get("job_title") or "").strip()] = roles.get(re.sub(r"\s*\(.*?\)\s*", " ", x.get("job_title") or "").strip(), 0) + 1
+            role_txt = ", ".join(f"{t} ({n})" if n > 1 else t for t, n in sorted(roles.items(), key=lambda kv: -kv[1]) if t)
+            pub = max(dparser.parse(x["created_at"]) for x in xs if x.get("created_at")).astimezone(UTC)
+            year = pub.year if pub.month < 11 else pub.year + 1
+            out.append({"id": jid("oau-portal:" + cat), "title": f"OAU {year} Staff Recruitment – {cat} positions ({len(xs)} openings)"[:160],
+                        "summary": (f"Obafemi Awolowo University, Ile-Ife is recruiting {cat.lower()} staff. Roles: {role_txt}. Apply on the university's own portal (free).")[:600],
+                        "url": "https://apply.oauife.edu.ng/", "source": s["name"], "tier": "official", "company": s["name"][:100],
+                        "location": (s.get("location") or "Ile-Ife")[:40], "kind": "research" if cat.startswith("Acad") else "job", "deadline": None,
+                        "published": pub.isoformat(), "industry": "Education", "_logo": s.get("logo") or None})
+    return out
+
+
+ATS_KINDS = ("greenhouse", "workable", "ashby", "smartrecruiters", "lever", "workday", "oau-portal")
+
+
+def _uniq(rows):
+    seen, out = set(), []
+    for r in rows:
+        if r["id"] not in seen: seen.add(r["id"]); out.append(r)
+    return out
+
+
 def from_source(s):
     kind = (s.get("type") or "auto").lower()
     try:
+        if kind in ATS_KINDS: return _uniq(from_ats(s, kind))
         if kind == "feed" or re.search(r"/feed/?$|\.(rss|xml)$|feed=rss", s["url"]):
             f = _rss(s["url"]); out = []
             for e in (f.entries if f else [])[:60]:
