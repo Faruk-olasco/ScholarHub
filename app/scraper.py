@@ -47,6 +47,13 @@ DEFAULT_SOURCES = [
     ("ScholarshipsAds", "https://www.scholarshipsads.com/", "html", "aggregator"),
     ("WeMakeScholars", "https://www.wemakescholars.com/", "html", "aggregator"),
     ("Studyportals", "https://www.studyportals.com", "html", "aggregator"),
+    # Funded PhD / graduate-position listing sites (universities post here themselves). Some block robots; harmless if so.
+    ("FindAPhD (funded)", "https://www.findaphd.com/phds/?Keywords=fully+funded", "html", "aggregator"),
+    ("EURAXESS PhD positions", "https://euraxess.ec.europa.eu/jobs/search?f%5B0%5D=offer_type%3Aphd", "html", "aggregator"),
+    ("Academic Positions (PhD)", "https://academicpositions.com/find-jobs/phd", "html", "aggregator"),
+    ("ScholarshipDb (PhD)", "https://scholarshipdb.net/PhD-scholarships", "html", "aggregator"),
+    ("jobs.ac.uk PhD studentships", "https://www.jobs.ac.uk/search/?keywords=studentship&academicDisciplineFacet=&jobType%5B%5D=phd", "html", "aggregator"),
+    ("Academic Transfer (NL PhD)", "https://www.academictransfer.com/en/jobs/?q=phd", "html", "aggregator"),
 ]
 
 
@@ -300,7 +307,7 @@ def normalise(entry, source_name, fetch_full=False):
 from urllib.parse import urljoin, urlparse
 OFFICIAL_DOMAIN = re.compile(r"\.(edu|ac|gov|go|gouv|govt)(\.[a-z]{2,3})?$|\b(university|universit|college|institute|ministry|embassy)\b", re.I)
 
-LINK_RE = re.compile(r"scholarship|fellowship|bursar|grant|award|stipend|studentship|funded", re.I)
+LINK_RE = re.compile(r"scholarship|fellowship|bursar|grant|award|stipend|studentship|funded|phd (?:position|student|candidate|project|opportunit)|doctoral (?:position|candidate|researcher|student)|ph\.?d\.? in\b", re.I)
 SKIP_RE = re.compile(r"login|sign.?in|privacy|cookie|contact|about|faq|search|filter|overview|how to apply|information for|host organisations|"
                      r"^find (a|an|your) |^all |^browse|^view all|^more |^read more|^scholarships? and fellowships?$|^scholarships?$|conference|gather|"
                      r"strengthening|celebrat|impact|alumni|news|blog|stories|#", re.I)
