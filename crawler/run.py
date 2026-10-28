@@ -1,8 +1,6 @@
-"""One-shot crawler: fetch every source, write new/updated scholarships to Supabase, exit.
-Runs on GitHub Actions on a schedule (twice a day) — see .github/workflows/crawl.yml.
+"""ScholarHub crawler – runs on GitHub Actions (free) twice a day and writes into Supabase.
 
-Env: SUPABASE_URL, SUPABASE_SERVICE_KEY (service_role key – never ship this in the app),
-     optional MAX_WORKERS (default 8), SKIP_SEARCH=1 to skip web-search sources.
+Env: SUPABASE_URL, SUPABASE_SERVICE_KEY (service role – bypasses RLS). Optional SKIP_SEARCH=1 to skip web-search sources.
 """
 import os, sys, time, logging, random
 from datetime import datetime, timezone, date
@@ -66,6 +64,21 @@ def upsert(items):
     new = [{k: v for k, v in i.items() if not k.startswith("_")} for i in items if i["id"] not in existing]
     now = datetime.now(timezone.utc).isoformat()
     old = [{"id": i["id"], "last_seen": now, **({"deadline": i["deadline"]} if i["deadline"] else {})} for i in items if i["id"] in existing]
+    # Annual call re-opened (deadline jumped forward > 60 days, e.g. 2026 round -> 2027 round): treat it as NEW again so it
+    # shows under "Newly Added", can be pushed and reminded about once more.
+    try:
+        prev = {}
+        for i in range(0, len(old), 300):
+            for r in SB.table("scholarships").select("id,deadline").in_("id", [o["id"] for o in old[i:i + 300]]).execute().data:
+                prev[r["id"]] = r.get("deadline")
+        reopened = [o["id"] for o in old if o.get("deadline") and prev.get(o["id"])
+                    and (date.fromisoformat(o["deadline"]) - date.fromisoformat(prev[o["id"]])).days > 60]
+        if reopened:
+            SB.table("scholarships").update({"first_seen": now}).in_("id", reopened).execute()
+            SB.table("notif_log").delete().in_("item_id", reopened).execute()
+            log.info("re-opened annual calls treated as new: %d", len(reopened))
+    except Exception as e:
+        log.warning("reopen check failed: %s", e)
     for i in range(0, len(new), 200):
         SB.table("scholarships").upsert(new[i:i + 200], on_conflict="id").execute()
     if new:
