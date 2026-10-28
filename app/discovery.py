@@ -39,6 +39,27 @@ FOREIGN = [("bourse d'études étudiants étrangers 2027", "fr", "FR", "FR:fr"),
            ("奨学金 留学生 2027 募集", "ja", "JP", "JP:ja"), ("장학금 외국인 유학생 2027", "ko", "KR", "KR:ko"), ("beasiswa luar negeri 2027", "id", "ID", "ID:id"),
            ("Türkiye bursları 2027 başvuru", "tr", "TR", "TR:tr")]
 
+# Funded graduate programmes advertised by the universities themselves (PhD/master's with stipend, assistantship,
+# tuition waiver, doctoral positions). These pages rarely contain the word "scholarship", so they need their own queries.
+FUNDED = ["\"fully funded\" PhD position 2027 international", "PhD studentship international students stipend 2027",
+          "\"graduate assistantship\" international students 2027", "\"tuition waiver\" PhD international students",
+          "doctoral researcher position E13 international applicants", "\"Marie Sklodowska-Curie\" doctoral network recruiting PhD",
+          "\"fully funded\" master's programme international students 2027", "funded PhD positions open call 2027",
+          "PhD fellowship university call for applications 2027", "\"research assistantship\" PhD international 2027",
+          "postgraduate research scholarship university international 2027", "\"PhD scholarship\" university 2027 international applicants",
+          "graduate school funding international students fall 2027", "doctoral program full funding stipend 2027"]
+FUNDED_SITES = ["site:.edu \"fully funded\" PhD international students", "site:.edu \"graduate assistantship\" international",
+                "site:.ac.uk PhD studentship international 2027", "site:.ac.uk \"fully funded\" studentship",
+                "site:.edu.sg PhD scholarship international 2027", "site:.edu.hk PhD fellowship 2027",
+                "site:.ac.kr PhD scholarship international students 2027", "site:.edu.cn PhD scholarship international 2027",
+                "site:.ac.jp doctoral scholarship international 2027", "site:.edu.tw PhD scholarship international 2027",
+                "site:.ethz.ch doctoral position", "site:.edu.au PhD scholarship international 2027",
+                "site:.nl PhD position fully funded university", "site:.de doctoral position university international applicants 2027",
+                "site:.se PhD student position university", "site:.no PhD research fellow university",
+                "site:.dk PhD scholarship university", "site:.fi doctoral researcher university",
+                "site:.ch PhD position university funded", "site:.be PhD scholarship university international",
+                "site:.ca \"fully funded\" graduate program international students"]
+
 
 def brave(q):
     return f"https://search.brave.com/search?q={quote_plus(q)}&source=web"
@@ -63,6 +84,8 @@ def build_query_sources():
     for c, l in itertools.product(["Nigeria", "Africa", "UK", "USA", "Canada", "Germany", "Japan", "China", "Australia", "Europe"],
                                   ["PhD", "masters", "undergraduate"]):
         out.append((f"Search: {l} {c}", gnews(f"{l} scholarship {c} when:30d"), "rss", "search"))
+    for q in FUNDED:
+        out.append((f"Search: funded {q[:40]}", gnews(q + " when:30d"), "rss", "search"))
     for hl, gl, ceid in LANGS[1:]:
         out.append((f"Search: scholarships ({gl} edition)", gnews("scholarship apply deadline when:7d", hl, gl, ceid), "rss", "search"))
     for q, hl, gl, ceid in FOREIGN:
@@ -76,6 +99,7 @@ def build_query_sources():
                 "site:.gov.ng scholarship 2027", "site:.edu.ng scholarship 2027", "site:.ac.za scholarship 2027", "site:.ac.ke scholarship 2027",
                 "site:.edu.gh scholarship 2027", "site:.nl scholarship international 2027 university", "site:.de stipendium international students 2027",
                 "site:.se scholarship international 2027", "site:.fr bourse étudiants internationaux 2027", "site:.it borsa di studio internazionali 2027"]
+    brave_qs += FUNDED + FUNDED_SITES
     for q in brave_qs:
         out.append((f"Web: {q}", brave(q), "brave", "search"))
     return out
