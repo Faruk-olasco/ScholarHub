@@ -58,7 +58,12 @@ FUNDED_SITES = ["site:.edu \"fully funded\" PhD international students", "site:.
                 "site:.se PhD student position university", "site:.no PhD research fellow university",
                 "site:.dk PhD scholarship university", "site:.fi doctoral researcher university",
                 "site:.ch PhD position university funded", "site:.be PhD scholarship university international",
-                "site:.ca \"fully funded\" graduate program international students"]
+                "site:.ca \"fully funded\" graduate program international students",
+                # US graduate admissions: schools announce "applications open for Fall 2027" on their own .edu pages
+                "site:.edu \"graduate admissions\" \"fall 2027\" \"now open\"", "site:.edu \"PhD program\" \"application deadline\" \"fall 2027\" international",
+                "site:.edu \"apply now\" \"fall 2027\" \"master's\" international students funding", "site:.edu \"PhD applications\" \"fall 2027\" \"fully funded\"",
+                "site:.edu \"graduate program\" \"fall 2027\" \"tuition waiver\" stipend", "site:.edu \"doctoral program\" \"fall 2027\" \"all admitted students\" funded",
+                "site:.edu \"application fee waiver\" \"fall 2027\" graduate international", "site:.edu \"MS program\" OR \"MA program\" \"fall 2027\" assistantship international"]
 
 
 def brave(q):
