@@ -60,7 +60,9 @@ FEEDS = [
     ("NGCareers", "https://ngcareers.com/feed/", "ng"),
     ("Opportunities for Africans", "https://www.opportunitiesforafricans.com/category/jobs/feed/", "intl"),
     ("We Work Remotely", "https://weworkremotely.com/remote-jobs.rss", "remote"),
+    ("Opportunity Shape", "https://opportunityshape.com/feed/", "abroad"),   # foreign jobs (all of them; kind "abroad" = visa sponsorship stated)
 ]
+SPONSORED = re.compile(r"visa[- ]sponsor\w*|sponsored visa|sponsorship (available|offered|provided)|tier 2|skilled worker visa|work permit (provided|sponsored|included)|relocation (package|support|assistance)", re.I)
 if os.environ.get("TRY_INDEED"):
     FEEDS.append(("Indeed Nigeria", "https://ng.indeed.com/rss?q=graduate+trainee&l=Nigeria&sort=date", "ng"))
 
@@ -84,7 +86,7 @@ NOISE = re.compile(r"\b(drivers?|dispatch riders?|riders?|cleaners?|janitor|secu
 KIND_RULES = [("internship", r"\bintern(ship)?s?\b|\bnysc\b|\bsiwes\b|industrial training"), ("graduate", r"\bgraduate|\btrainee|entry[- ]level|fresh"),
               ("research", r"fellow|research|lecturer|teaching|teacher|tutor|academic|postdoc"),
               ("ngo", r"volunteer|ngo|foundation|initiative|unicef|undp|who\b|save the children|red cross|msf|chai\b|consortium|relief|humanitarian|non[- ]profit|charity"),
-              ("remote", r"remote|work from home|anywhere")]
+              ("remote", r"remote|work from home|anywhere"), ("abroad", r"visa sponsor|sponsored visa|skilled worker visa|work permit")]
 
 # ---------------------------------------------------------------------------------------------
 # Employer watch list (table job_sources: name, url, type auto|page|feed, location, logo, active)
@@ -345,6 +347,22 @@ def split_title(title, source):
     return title, ""
 
 
+def abroad_split(title):
+    """Opportunity Shape titles: 'Role Job at Company in Country (Visa Sponsorship Available)' or
+    'Company Hiring Role in Country — £…' -> (role, company, country)."""
+    t = re.sub(r"\s*[\(\[][^)\]]*(visa|sponsor|relocat)[^)\]]*[\)\]]", "", title, flags=re.I)
+    t = re.split(r"\s+[—–-]\s+", t)[0].strip()
+    m = re.match(r"(.+?)\s+(?:jobs?|positions?|vacanc(?:y|ies)|openings?)?\s*(?:at|with)\s+(.+?)\s+in\s+(?:the\s+)?([A-Z][A-Za-z ,.]+)$", t, re.I)
+    if m: return m.group(1).strip(), m.group(2).strip(), m.group(3).strip()
+    m = re.match(r"(.+?)\s+(?:is\s+)?(?:hiring|recruiting|seeks?|looking for)\s+(?:\d+\s+)?(.+?)\s+in\s+(?:the\s+)?([A-Z][A-Za-z ,.]+)$", t, re.I)
+    if m: return m.group(2).strip(), m.group(1).strip(), m.group(3).strip()
+    m = re.match(r"(.+?)\s+(?:jobs?|positions?|vacanc(?:y|ies)|openings?)?\s*(?:at|with)\s+(.+?),\s*([A-Z][A-Za-z .]+)$", t, re.I)   # 'Role Job at Company, Country'
+    if m: return m.group(1).strip(), m.group(2).strip(), m.group(3).strip()
+    m = re.match(r"(.+?)\s+in\s+(?:the\s+)?([A-Z][A-Za-z ,.]+)$", t)
+    if m: return m.group(1).strip(), "", m.group(2).strip()
+    return t, "", ""
+
+
 def location_of(text, source, feed_kind):
     if feed_kind == "remote" or re.search(r"\bremote\b|work from home", text, re.I): return "Remote"
     m = re.search(r"\b(?:Location|Based in|Job Location)\s*:?\s*([A-Z][A-Za-z\- ]+(?:,\s*[A-Z][A-Za-z ]+)?)", text)
@@ -366,10 +384,16 @@ def from_feed(name, url, feed_kind):
         link = (e.get("link") or "").strip()
         raw_title = clean(e.get("title"))
         if not link or len(raw_title) < 8: continue
-        if NOISE.search(raw_title): continue
-        if feed_kind != "remote" and not WANT.search(raw_title): continue
-        role, company = split_title(raw_title, name)
         summ = clean(e.get("summary") or (e.get("content") or [{}])[0].get("value", "") or "")
+        country = ""
+        if feed_kind == "abroad":   # every foreign job post (any role); scholarships from the same feed go to the scholarship crawler instead
+            if re.search(r"scholarship|fellowship|studentship|bursary|\bgrants?\b|phd|masters?|undergraduate|postgraduate|exchange program", raw_title, re.I): continue
+            if re.search(r"consultan(t|cy) fee|pay (a |any )?fee|processing fee|guaranteed visa|lottery", raw_title, re.I): continue
+            role, company, country = abroad_split(raw_title)
+        else:
+            if NOISE.search(raw_title): continue
+            if feed_kind != "remote" and not WANT.search(raw_title): continue
+            role, company = split_title(raw_title, name)
         summ = re.sub(r"^(job (title|description)\s*:?\s*)", "", summ, flags=re.I)
         text = role + " " + company + " " + summ[:400]
         if feed_kind == "remote" and not re.search(r"junior|entry|associate|intern|graduate|support|assistant|analyst|coordinator|writer|designer|developer|engineer|marketing|customer", text, re.I):
@@ -381,7 +405,7 @@ def from_feed(name, url, feed_kind):
         m = re.search(r"(?:Application )?(?:Deadline|Closing Date|Apply before|Expires?)\s*:?\s*([0-9]{1,2}(?:st|nd|rd|th)?,?\s+[A-Za-z]+,?\s+20\d\d|[A-Za-z]+\s+[0-9]{1,2},?\s+20\d\d|20\d\d-\d\d-\d\d)", summ)
         if m: dl = parse_day(m.group(1))
         out.append({"id": jid(link), "title": role[:160], "summary": summ[:600], "url": link, "source": name, "tier": "board",
-                    "company": company[:100], "location": location_of(text, name, feed_kind)[:40], "kind": kind_of(text),
+                    "company": company[:100], "location": (country or location_of(text, name, feed_kind))[:40], "kind": "abroad" if (feed_kind == "abroad" and SPONSORED.search(raw_title)) else kind_of(text),
                     "deadline": dl, "published": pub.isoformat(), "industry": clean(e.get("industry") or "")[:60] or None})
     return out
 
@@ -390,7 +414,7 @@ def from_feed(name, url, feed_kind):
 # Job page: closing date + schema.org JobPosting (+ employer logo if the page carries one)
 # ---------------------------------------------------------------------------------------------
 GENERIC_LOGO = re.compile(r"/(company/|employer/|uploads/)?(logo|default|placeholder|no[-_]?logo|company|employer|blank)\.(png|jpe?g|webp)(\?|$)", re.I)
-BOARD_HOSTS = re.compile(r"hotnigerianjobs|jobzilla|myjobmag|jobsinnigeria|ngcareers|weworkremotely|wwr|opportunitiesforafricans|indeed|"
+BOARD_HOSTS = re.compile(r"hotnigerianjobs|jobzilla|myjobmag|jobsinnigeria|ngcareers|weworkremotely|wwr|opportunitiesforafricans|opportunityshape|indeed|"
                          r"wp-cookie|gravatar|share|facebook|twitter|whatsapp|linkedin|telegram|og-images", re.I)
 
 
