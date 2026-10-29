@@ -167,12 +167,14 @@ def main():
     for topic, (region, off) in TOPICS.items():
         if force_topic and topic != force_topic: continue
         local_hour = (now + timedelta(hours=off)).hour
-        slot = force_slot or SLOT_HOUR.get(local_hour)
-        if not slot: continue
-        # once per slot per day per topic (guards against a re-run of the hour)
+        if not force_slot and not (7 <= local_hour < 22): continue        # quiet hours – never catch up at night
+        # GitHub's hourly schedule is often delayed or skipped, so instead of requiring an exact hour we send the
+        # LATEST slot that is already due today and has not been sent yet (one per run – no bursts).
         day_start = (now + timedelta(hours=off)).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=off)
-        already = SB.table("notif_log").select("id").eq("topic", topic).eq("slot", slot).gte("sent_at", day_start.isoformat()).limit(1).execute().data
-        if already and not force_slot: log.info("%s/%s already sent today", topic, slot); continue
+        done = {r["slot"] for r in SB.table("notif_log").select("slot").eq("topic", topic).gte("sent_at", day_start.isoformat()).execute().data}
+        due = [SLOT_HOUR[h] for h in sorted(SLOT_HOUR) if h <= local_hour and SLOT_HOUR[h] not in done]
+        slot = force_slot or (due[-1] if due else None)
+        if not slot: log.info("%s: nothing due (local %02d:00)", topic, local_hour); continue
         try: sent += run_slot(project, token, topic, slot, region)
         except Exception as e: log.warning("%s/%s failed: %s", topic, slot, e)
     log.info("done: %d messages", sent)
