@@ -1,7 +1,7 @@
 name: Daily notifications
 on:
   schedule:
-    - cron: "30 * * * *"       # every hour at :30 – notify.py works out which audience is at 07/10/13/16/19 local time
+    - cron: "17,47 * * * *"    # twice an hour (odd minutes – GitHub skips busy :00/:30 slots); notify.py sends whatever slot is due
   workflow_dispatch:
     inputs:
       slot:  { description: "Force a slot (morning | news | tech | closing | evening) – leave empty for normal", required: false, default: "" }
