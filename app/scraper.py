@@ -41,6 +41,7 @@ DEFAULT_SOURCES = [
     ("Study Abroad Nations", "https://www.studyabroadnations.com/feed/", "rss", "aggregator"),
     ("Talk2Sam Africa", "https://talk2samafrica.com/feed/", "rss", "aggregator"),
     ("Opportunity Shape", "https://opportunityshape.com/feed/", "rss", "aggregator"),
+    ("Scholars4dev", "https://www.scholars4dev.com/feed/", "rss", "aggregator"),
     ("Nigeria NUC", "https://www.nuc.edu.ng/feed/", "rss", "official"),
     ("South Africa Government", "https://www.gov.za/rss.xml", "rss", "official"),
     ("Gates Cambridge", "https://www.gatescambridge.org/", "html", "official"),
