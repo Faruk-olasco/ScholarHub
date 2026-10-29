@@ -6,7 +6,7 @@ Slots (Africa/Lagos time; the GitHub schedule runs twice an hour and sends whate
   10:30  news      School News top story
   12:30  jobs      best new job (graduate / internship / NGO / research / remote)
   13:30  tech      Tech Updates top story
-  16:30  closing   a scholarship closing within 2–7 days
+  16:30  closing   a scholarship closing within 5–14 days
   19:30  evening   best scholarship (new ones first)  — deadline reminders for saved items are local on the phone
 
 Audience topics = the ones the app subscribes to: "all" (no region chosen) and r_<region>.
@@ -77,10 +77,32 @@ def _days_left(d):
     except Exception: return None
 
 
+# Pushes must be useful to our audience: never something closing in under 5 days, never something restricted to
+# another country's citizens, and prefer calls that say international / African / Nigerian / developing countries.
+MIN_DAYS = 5
+RESTRICTED = re.compile(r"\b(?:for|to|only|exclusively)\s+(?:indian|pakistani|bangladeshi|sri\s*lankan|nepal(?:i|ese)|filipino|indonesian|malaysian|vietnamese|thai|chinese|"
+                        r"japanese|korean|american|us|u\.s\.|canadian|mexican|brazilian|british|uk|irish|australian|new\s+zealand|european|eu|german|french|italian|spanish|"
+                        r"dutch|turkish|egyptian|moroccan|kenyan|ghanaian|ugandan|tanzanian|zimbabwean|zambian|south\s+african|ethiopian|rwandan)\s+(?:students?|citizens?|nationals?|residents?)\b|"
+                        r"\b(?:citizens?|residents?|nationals?)\s+of\s+(?!nigeria|africa|developing|commonwealth|ecowas|sub-saharan)[A-Z][a-z]+\s+only\b|\b(?:in-state|domestic\s+students?\s+only)\b", re.I)
+WELCOME = re.compile(r"international|developing countr|africa|nigeria|global|worldwide|all nationalities|any nationality|commonwealth|ecowas|sub-saharan|low.and.middle.income", re.I)
+
+
+def _eligible(c):
+    text = (c.get("title") or "") + " " + (c.get("summary") or "")
+    if RESTRICTED.search(text) and not re.search(r"nigeria|africa", text, re.I): return False
+    dl = _days_left(c.get("deadline") or "")
+    return dl is None or dl >= MIN_DAYS
+
+
+def _welcome(c):
+    text = (c.get("title") or "") + " " + (c.get("summary") or "") + " " + (c.get("regions") or "") + " " + (c.get("countries") or "")
+    return bool(WELCOME.search(text))
+
+
 def pick_scholarship(topic, region, closing=False):
     today = datetime.now(timezone.utc).date()
     sent, _ = _sent_ids(topic); avoid_src = _last_source(topic)
-    base_cols = "id,title,summary,deadline,source,regions,funding,image,logo,org,first_seen"
+    base_cols = "id,title,summary,deadline,source,regions,countries,funding,image,logo,org,first_seen"
 
     def q():
         qq = SB.table("scholarships").select(base_cols)
@@ -88,18 +110,22 @@ def pick_scholarship(topic, region, closing=False):
         return qq
 
     cands = []
-    if closing:
-        cands = q().gte("deadline", (today + timedelta(days=2)).isoformat()).lte("deadline", (today + timedelta(days=7)).isoformat()) \
-                   .order("has_img", desc=True).order("deadline").limit(60).execute().data or []
+    if closing:   # "closing soon" = 5–14 days left: enough time to actually apply
+        cands = q().gte("deadline", (today + timedelta(days=MIN_DAYS)).isoformat()).lte("deadline", (today + timedelta(days=14)).isoformat()) \
+                   .order("has_img", desc=True).order("deadline").limit(80).execute().data or []
     else:
         fresh = (datetime.now(timezone.utc) - timedelta(hours=26)).isoformat()
-        cands = q().gte("first_seen", fresh).or_(f"deadline.is.null,deadline.gte.{today.isoformat()}") \
-                   .order("has_img", desc=True).order("deadline", nullsfirst=False).limit(60).execute().data or []
-        if not [c for c in cands if c["id"] not in sent]:     # nothing new -> strongest open listing not yet sent
-            cands = q().or_(f"deadline.is.null,deadline.gte.{(today + timedelta(days=3)).isoformat()}") \
-                       .order("has_img", desc=True).order("first_seen", desc=True).limit(120).execute().data or []
-    cands = [c for c in cands if c["id"] not in sent and c.get("summary")]
-    pref = [c for c in cands if c["source"] != avoid_src and (c.get("funding") or "").startswith("fully")] or \
+        far = (today + timedelta(days=MIN_DAYS)).isoformat()
+        cands = q().gte("first_seen", fresh).or_(f"deadline.is.null,deadline.gte.{far}") \
+                   .order("has_img", desc=True).order("deadline", nullsfirst=False).limit(80).execute().data or []
+        if not [c for c in cands if c["id"] not in sent and _eligible(c)]:     # nothing new -> strongest open listing not yet sent
+            cands = q().or_(f"deadline.is.null,deadline.gte.{far}") \
+                       .order("has_img", desc=True).order("first_seen", desc=True).limit(150).execute().data or []
+    cands = [c for c in cands if c["id"] not in sent and c.get("summary") and _eligible(c)]
+    # preference order: welcomes international/African applicants + fully funded > welcomes > fully funded > anything eligible
+    pref = [c for c in cands if c["source"] != avoid_src and _welcome(c) and (c.get("funding") or "").startswith("fully")] or \
+           [c for c in cands if c["source"] != avoid_src and _welcome(c)] or \
+           [c for c in cands if c["source"] != avoid_src and (c.get("funding") or "").startswith("fully")] or \
            [c for c in cands if c["source"] != avoid_src] or cands
     if not pref: return None
     c = pref[0]; dl = _days_left(c.get("deadline") or "")
