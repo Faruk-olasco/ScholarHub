@@ -1,19 +1,16 @@
 """
-notify.py — six rich notifications per day, same card for everyone, Nigeria time.
+notify.py — one push per run, sent to everyone, chosen by rotation. You decide when and how often by running the
+"Daily notifications" workflow (GitHub "Run workflow" button, or the HTTP Shortcuts button on your phone).
 
-Slots (Africa/Lagos time; the GitHub schedule runs twice an hour and sends whatever slot is due):
-  07:30  morning   best scholarship (new ones first)
-  10:30  news      School News top story
-  12:30  jobs      best new job (graduate / internship / NGO / research / remote)
-  13:30  tech      Tech Updates top story
-  16:30  closing   a scholarship closing within 5–14 days
-  19:30  evening   best scholarship (new ones first)  — deadline reminders for saved items are local on the phone
+Each run sends exactly ONE card and moves to the next type:
+  scholarship -> news (School News) -> jobs -> tech (Tech Updates) -> closing (scholarship closing in 5–14 days) -> scholarship ...
+Optional SLOT input forces a type (scholarship | news | jobs | tech | closing) – handy for separate phone buttons.
 
-Audience topics = the ones the app subscribes to: "all" (no region chosen) and r_<region>.
-Every slot ALWAYS sends: the item is the best one not sent before (notif_log), never the same source twice
-in a row, pictures first. Payload = card: title, snippet (+ deadline chip), picture / institution logo, deep link to the card.
+Rules: never the same item twice (notif_log), never the same source twice in a row, pictures first; scholarships must be
+open to international / African applicants and have 5+ days left. Payload = card: title, snippet (+ deadline chip),
+picture / institution logo, deep link to the card. Same card goes to every audience topic at the same moment.
 
-Env: SUPABASE_URL, SUPABASE_SERVICE_KEY, FIREBASE_SERVICE_ACCOUNT.  Optional: SLOT=<name> to force a slot, TOPIC=<topic> to force one topic.
+Env: SUPABASE_URL, SUPABASE_SERVICE_KEY, FIREBASE_SERVICE_ACCOUNT.  Optional: SLOT, TOPIC (one topic only).
 """
 import os, re, json, logging
 from datetime import datetime, timezone, timedelta, date
@@ -27,7 +24,8 @@ SB = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"
 # topic -> (display region, UTC offset hours). Offsets are "typical" – a slot lands within an hour of target time.
 TOPICS = {"all": ("", 1), "r_africa": ("Africa", 1), "r_europe": ("Europe", 1), "r_north_america": ("North America", -5),
           "r_asia": ("Asia", 8), "r_middle_east": ("Middle East", 3), "r_oceania": ("Oceania", 10), "r_latin_america": ("Latin America", -3)}
-SLOT_HOUR = {7: "morning", 10: "news", 12: "jobs", 13: "tech", 16: "closing", 19: "evening"}
+ROTATION = ["morning", "news", "jobs", "tech", "closing"]      # "morning" = scholarship pick
+ALIAS = {"scholarship": "morning", "evening": "morning", "scholarships": "morning", "job": "jobs", "schoolnews": "news", "school_news": "news"}
 PLAY = "https://play.google.com/store/apps/details?id=com.scholarhub.app"
 
 
@@ -186,25 +184,19 @@ def main():
     raw = os.environ.get("FIREBASE_SERVICE_ACCOUNT", "").strip()
     if not raw: log.info("no FIREBASE_SERVICE_ACCOUNT – skipping"); return
     sa = json.loads(raw); project = sa["project_id"]; token = _token(sa)
-    now = datetime.now(timezone.utc)
-    force_slot, force_topic = os.environ.get("SLOT"), os.environ.get("TOPIC")
-    # ONE schedule for everybody (Nigeria time, UTC+1): the same card reaches every audience at the same moment,
-    # whichever region a user picked in the app. Regional topics are kept only so older app versions still receive it.
-    off = 1
-    local_hour = (now + timedelta(hours=off)).hour
-    if not force_slot and not (7 <= local_hour < 22): log.info("quiet hours (local %02d:00)", local_hour); return
-    # GitHub's schedule is often delayed or skipped, so instead of requiring an exact hour we send the LATEST slot
-    # that is already due today and has not been sent yet (one per run – no bursts).
-    day_start = (now + timedelta(hours=off)).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=off)
-    done = {r["slot"] for r in SB.table("notif_log").select("slot").eq("topic", "all").gte("sent_at", day_start.isoformat()).execute().data}
-    due = [SLOT_HOUR[h] for h in sorted(SLOT_HOUR) if h <= local_hour and SLOT_HOUR[h] not in done]
-    slot = force_slot or (due[-1] if due else None)
-    if not slot: log.info("nothing due (local %02d:00)", local_hour); return
-    item = {"morning": lambda: pick_scholarship("all", ""), "evening": lambda: pick_scholarship("all", ""),
-            "closing": lambda: pick_scholarship("all", "", closing=True) or pick_scholarship("all", ""),
-            "news": lambda: pick_news("all", "school_news") or pick_scholarship("all", ""),
-            "tech": lambda: pick_news("all", "tech_news") or pick_scholarship("all", ""),
-            "jobs": lambda: pick_job("all") or pick_scholarship("all", "")}[slot]()
+    force_slot = (os.environ.get("SLOT") or "").strip().lower(); force_topic = os.environ.get("TOPIC")
+    force_slot = ALIAS.get(force_slot, force_slot)
+    if force_slot and force_slot not in ROTATION: log.warning("unknown SLOT %r – use scholarship|news|jobs|tech|closing", force_slot); return
+    # rotation: continue after whatever type was sent last (manual runs decide the timing; this only decides the type)
+    last = SB.table("notif_log").select("slot").eq("topic", "all").order("sent_at", desc=True).limit(1).execute().data
+    last_slot = ALIAS.get(last[0]["slot"], last[0]["slot"]) if last else None
+    slot = force_slot or ROTATION[(ROTATION.index(last_slot) + 1) % len(ROTATION) if last_slot in ROTATION else 0]
+    pickers = {"morning": lambda: pick_scholarship("all", ""),
+               "closing": lambda: pick_scholarship("all", "", closing=True) or pick_scholarship("all", ""),
+               "news": lambda: pick_news("all", "school_news") or pick_scholarship("all", ""),
+               "tech": lambda: pick_news("all", "tech_news") or pick_scholarship("all", ""),
+               "jobs": lambda: pick_job("all") or pick_scholarship("all", "")}
+    item = pickers[slot]()
     if not item: log.info("%s: nothing to send", slot); return
     sent = 0
     for topic in TOPICS:
