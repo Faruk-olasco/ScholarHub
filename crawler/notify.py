@@ -1,7 +1,7 @@
 """
-notify.py — six rich notifications per day, per audience topic, at local times.
+notify.py — six rich notifications per day, same card for everyone, Nigeria time.
 
-Slots (local time of the audience; the GitHub schedule runs every hour at :30):
+Slots (Africa/Lagos time; the GitHub schedule runs twice an hour and sends whatever slot is due):
   07:30  morning   best scholarship (new ones first)
   10:30  news      School News top story
   12:30  jobs      best new job (graduate / internship / NGO / research / remote)
@@ -10,8 +10,7 @@ Slots (local time of the audience; the GitHub schedule runs every hour at :30):
   19:30  evening   best scholarship (new ones first)  — deadline reminders for saved items are local on the phone
 
 Audience topics = the ones the app subscribes to: "all" (no region chosen) and r_<region>.
-Each topic has an assumed timezone so a user in Lagos and a user in Manila both get the morning slot in their morning.
-Every slot ALWAYS sends: the item is the best one not sent before on that topic (notif_log), never the same source twice
+Every slot ALWAYS sends: the item is the best one not sent before (notif_log), never the same source twice
 in a row, pictures first. Payload = card: title, snippet (+ deadline chip), picture / institution logo, deep link to the card.
 
 Env: SUPABASE_URL, SUPABASE_SERVICE_KEY, FIREBASE_SERVICE_ACCOUNT.  Optional: SLOT=<name> to force a slot, TOPIC=<topic> to force one topic.
@@ -163,21 +162,32 @@ def main():
     sa = json.loads(raw); project = sa["project_id"]; token = _token(sa)
     now = datetime.now(timezone.utc)
     force_slot, force_topic = os.environ.get("SLOT"), os.environ.get("TOPIC")
+    # ONE schedule for everybody (Nigeria time, UTC+1): the same card reaches every audience at the same moment,
+    # whichever region a user picked in the app. Regional topics are kept only so older app versions still receive it.
+    off = 1
+    local_hour = (now + timedelta(hours=off)).hour
+    if not force_slot and not (7 <= local_hour < 22): log.info("quiet hours (local %02d:00)", local_hour); return
+    # GitHub's schedule is often delayed or skipped, so instead of requiring an exact hour we send the LATEST slot
+    # that is already due today and has not been sent yet (one per run – no bursts).
+    day_start = (now + timedelta(hours=off)).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=off)
+    done = {r["slot"] for r in SB.table("notif_log").select("slot").eq("topic", "all").gte("sent_at", day_start.isoformat()).execute().data}
+    due = [SLOT_HOUR[h] for h in sorted(SLOT_HOUR) if h <= local_hour and SLOT_HOUR[h] not in done]
+    slot = force_slot or (due[-1] if due else None)
+    if not slot: log.info("nothing due (local %02d:00)", local_hour); return
+    item = {"morning": lambda: pick_scholarship("all", ""), "evening": lambda: pick_scholarship("all", ""),
+            "closing": lambda: pick_scholarship("all", "", closing=True) or pick_scholarship("all", ""),
+            "news": lambda: pick_news("all", "school_news") or pick_scholarship("all", ""),
+            "tech": lambda: pick_news("all", "tech_news") or pick_scholarship("all", ""),
+            "jobs": lambda: pick_job("all") or pick_scholarship("all", "")}[slot]()
+    if not item: log.info("%s: nothing to send", slot); return
     sent = 0
-    for topic, (region, off) in TOPICS.items():
+    for topic in TOPICS:
         if force_topic and topic != force_topic: continue
-        local_hour = (now + timedelta(hours=off)).hour
-        if not force_slot and not (7 <= local_hour < 22): continue        # quiet hours – never catch up at night
-        # GitHub's hourly schedule is often delayed or skipped, so instead of requiring an exact hour we send the
-        # LATEST slot that is already due today and has not been sent yet (one per run – no bursts).
-        day_start = (now + timedelta(hours=off)).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=off)
-        done = {r["slot"] for r in SB.table("notif_log").select("slot").eq("topic", topic).gte("sent_at", day_start.isoformat()).execute().data}
-        due = [SLOT_HOUR[h] for h in sorted(SLOT_HOUR) if h <= local_hour and SLOT_HOUR[h] not in done]
-        slot = force_slot or (due[-1] if due else None)
-        if not slot: log.info("%s: nothing due (local %02d:00)", topic, local_hour); continue
-        try: sent += run_slot(project, token, topic, slot, region)
+        try:
+            ok = _send(project, token, topic, slot, item["title"], item["body"], item.get("image"), {**item["data"], "topic": topic})
+            if ok: SB.table("notif_log").insert({"slot": slot, "topic": topic, "item_id": item["id"]}).execute(); sent += 1
         except Exception as e: log.warning("%s/%s failed: %s", topic, slot, e)
-    log.info("done: %d messages", sent)
+    log.info("%s -> %s | sent to %d audiences", slot, item["title"][:70], sent)
 
 
 if __name__ == "__main__":
