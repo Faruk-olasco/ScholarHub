@@ -1,11 +1,9 @@
 name: Daily notifications
 on:
-  schedule:
-    - cron: "17,47 * * * *"    # twice an hour (odd minutes – GitHub skips busy :00/:30 slots); notify.py sends whatever slot is due
-  workflow_dispatch:
+  workflow_dispatch:           # manual only: each run sends ONE push (GitHub button or the phone shortcut)
     inputs:
-      slot:  { description: "Force a slot (morning | news | tech | closing | evening) – leave empty for normal", required: false, default: "" }
-      topic: { description: "Force one topic (all | r_africa | …) – leave empty for all", required: false, default: "" }
+      slot:  { description: "Type to send (scholarship | news | jobs | tech | closing) – leave empty to rotate", required: false, default: "" }
+      topic: { description: "One audience only (all | r_africa | …) – leave empty for everyone", required: false, default: "" }
 concurrency: { group: notify, cancel-in-progress: false }
 jobs:
   notify:
@@ -16,7 +14,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
       - run: pip install -r crawler/requirements.txt
-      - name: Send the slot that is due
+      - name: Send one push
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
