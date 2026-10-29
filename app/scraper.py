@@ -39,6 +39,8 @@ DEFAULT_SOURCES = [
     ("Opportunities Circle", "https://www.opportunitiescircle.com/feed/", "rss", "aggregator"),
     ("GreatYop", "https://greatyop.com/feed/", "rss", "aggregator"),
     ("Study Abroad Nations", "https://www.studyabroadnations.com/feed/", "rss", "aggregator"),
+    ("Talk2Sam Africa", "https://talk2samafrica.com/feed/", "rss", "aggregator"),
+    ("Opportunity Shape", "https://opportunityshape.com/feed/", "rss", "aggregator"),
     ("Nigeria NUC", "https://www.nuc.edu.ng/feed/", "rss", "official"),
     ("South Africa Government", "https://www.gov.za/rss.xml", "rss", "official"),
     ("Gates Cambridge", "https://www.gatescambridge.org/", "html", "official"),
