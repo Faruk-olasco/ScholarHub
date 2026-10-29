@@ -143,8 +143,7 @@ def find_any(text, mapping):
 
 
 
-
-TITLE_POS = re.compile(r"scholarship|fellowship|grant|bursar|studentship|fully.funded|funded|award|internship|exchange program|summer school|competition|challenge|contest|prize|traineeship|phd position|doctoral|postdoc", re.I)
+TITLE_POS = re.compile(r"scholarship|fellowship|grant|bursar|studentship|fully.funded|funded|award|internship|exchange program|summer school|competition|challenge|contest|prize|traineeship|phd position|doctoral|postdoc|graduate admissions?|graduate (?:program|school) applications?|phd (?:program|applications?)|master'?s (?:program|applications?)|assistantship|tuition waiver", re.I)
 # news about scholarships (not opportunities): someone received / donated / celebrated
 NEWS_NEG = re.compile(r"\b(receives?|received|receiving|recipients?|awarded|awards?\s+(?:\$|\d|presented|go\s+to)|presents?|presented|donat\w*|gift|raises?|raised|"
                       r"honou?rs?|honored|celebrat\w*|names?\s+\w+\s+(?:scholars?|winners?)|named|selected\s+as|wins?|won|graduates\s+(?:with|from|under)|finishes|completes|"
