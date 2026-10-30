@@ -130,7 +130,7 @@ async function openById(id) {
 function idFromUrl(u) { try { return new URL(u).searchParams.get("s"); } catch (e) { return null; } }
 
 const $ = (s) => document.querySelector(s);
-const state = { tab: "all", region: "", newOnly: 0, q: "", level: "", field: "", funding: "", tier: "", country: "", added: 0, dlFrom: "", dlTo: "", expired: 0, offset: 0, items: [], total: 0, detailOpens: 0 };
+const state = { tab: "all", region: "", newOnly: 0, q: "", level: "", field: "", funding: "", tier: "", country: "", added: 0, dlFrom: "", dlTo: "", expired: 0, jobKind: "", offset: 0, items: [], total: 0, detailOpens: 0 };
 const saved = new Set(JSON.parse(localStorage.getItem("saved") || "[]"));
 const savedItems = JSON.parse(localStorage.getItem("savedItems") || "{}");
 // My Plan: personal to-do list + per-scholarship notes (stored on the phone only)
@@ -161,8 +161,8 @@ async function applyDailyPush() {
   if (!isNative || !FCM) return;
   try {
     try { await FCM.createChannel({ id: "scholarhub_daily", name: "Daily picks", description: "Six short updates a day: scholarships, school news, jobs, tech and closing-soon deadlines", importance: 4 }); } catch (e) {}
-    const want = notif.daily ? topicOf(notif.region) : null;
-    const topics = ["all"].concat(FILTERS.regions.map(topicOf));
+    const want = notif.daily ? topicOf(notif.region) + "_v2" : null;   // "_v2" = this app draws the push card itself (picture in the banner); plain topics are for older versions
+    const base = ["all"].concat(FILTERS.regions.map(topicOf)), topics = base.concat(base.map((t) => t + "_v2"));
     for (const t of topics) { if (t !== want) { try { await FCM.unsubscribeFromTopic({ topic: t }); } catch (e) {} } }
     if (want) await FCM.subscribeToTopic({ topic: want });
   } catch (e) { console.warn("push", e); }
@@ -356,7 +356,7 @@ async function load(reset = true) {
 const NEWS_TABS = {
   news: { table: "school_news", label: "School News · Nigeria", cols: "id,title,summary,url,source,tier,school_code,school,kind,published,image,logo" },
   tech: { table: "tech_news", label: "Tech Updates", cols: "id,title,summary,url,source,tier,published,image,logo" },
-  jobs: { table: "jobs", label: "Jobs · Nigeria & remote", cols: "id,title,summary,url,source,tier,company,location,kind,deadline,published,image,logo", open: "Apply on site ↗" },
+  jobs: { table: "jobs", label: "Jobs · Nigeria, remote & abroad", cols: "id,title,summary,url,source,tier,company,location,kind,deadline,published,image,logo", open: "Apply on site ↗" },
 };
 const isNewsTab = () => !!NEWS_TABS[state.tab];
 const seenAt = {}; // when this tab was last opened (per session) -> items newer than that get a green dot
@@ -364,6 +364,7 @@ function newsQuery(offset) {
   const t = NEWS_TABS[state.tab]; const p = new URLSearchParams();
   p.set("select", t.cols);
   if (state.q) { const q = state.q.replace(/[%*,()."'\\:&|!<>]/g, " ").replace(/\s+/g, " ").trim(); if (q) p.set("or", `(title.wfts(english).${q},summary.wfts(english).${q}${state.tab === "news" ? `,school.ilike.*${q}*,school_code.ilike.*${q}*` : state.tab === "jobs" ? `,company.ilike.*${q}*,location.ilike.*${q}*` : ""})`); }
+  if (state.tab === "jobs" && state.jobKind) p.set("kind", "eq." + state.jobKind); // category dropdown on the Jobs page
   if (state.tab === "jobs") { if (p.has("or")) { p.set("and", `(or${p.get("or")},or(deadline.is.null,deadline.gte.${today()}))`); p.delete("or"); } else p.set("or", `(deadline.is.null,deadline.gte.${today()})`); } // closed jobs disappear the day after the closing date
   p.set("order", "has_img.desc,published.desc"); p.set("limit", 30); p.set("offset", offset);
   return "/" + t.table + "?" + p.toString();
@@ -386,7 +387,7 @@ async function loadNews(seq) {
   }
 }
 const KIND_PILL = { admission: ["Admission", "adm"], scholarship: ["Scholarship", "sch"], fees: ["Fees", "fee"], calendar: ["Calendar", "cal"], notice: ["Notice", "urg"], convocation: ["Convocation", "cal"],
-  graduate: ["Graduate", "adm"], internship: ["Internship", "cal"], ngo: ["NGO", "sch"], research: ["Research", "sch"], remote: ["Remote", "fee"], job: ["Job", "off"] };
+  graduate: ["Graduate", "adm"], internship: ["Internship", "cal"], ngo: ["NGO", "sch"], research: ["Research", "sch"], remote: ["Remote", "fee"], abroad: ["Visa sponsored", "urg"], job: ["Job", "off"] };
 const whoLine = (i) => i.school ? esc(i.school) + " · " : i.company ? esc(i.company) + (i.location ? " · " + esc(i.location) : "") + " · " : i.location ? esc(i.location) + " · " : "";
 function ago(d) { const m = Math.max(0, Math.round((Date.now() - new Date(d)) / 60000)); if (m < 60) return m <= 1 ? "just now" : m + " min ago"; const h = Math.round(m / 60); if (h < 24) return h + " h ago"; const dd = Math.round(h / 24); if (dd < 7) return dd === 1 ? "yesterday" : dd + " days ago"; return new Date(d).toLocaleDateString([], { day: "numeric", month: "short" }); }
 function spreadEmployers(items) { // in-place: when two neighbours share an employer, pull the next different employer forward
@@ -412,7 +413,7 @@ function newsCardHtml(i, sec, isNew) { // one card for School News / Tech Update
 }
 function renderNews() {
   const list = $("#list"), t = NEWS_TABS[state.tab];
-  $("#stats").textContent = `${state.total.toLocaleString()} updates · ${t.label}${state.q ? " · “" + state.q + "”" : ""}`;
+  $("#stats").textContent = `${state.total.toLocaleString()} updates · ${t.label}${state.tab === "jobs" && state.jobKind ? " · " + (KIND_PILL[state.jobKind] || [state.jobKind])[0] : ""}${state.q ? " · “" + state.q + "”" : ""}`;
   if (!state.items.length) { list.innerHTML = `<div class="empty">${state.q ? "No updates match your search." : "No updates yet — pull down to refresh."}</div>`; $("#more").classList.add("hidden"); return; }
   const since = seenAt[state.tab] || 0;
   if (state.tab === "jobs") spreadEmployers(state.items); // never the same employer twice in a row
@@ -449,7 +450,27 @@ function setMode() {
   document.body.classList.toggle("mode-news", isNewsTab());
   document.querySelectorAll(".hubbtn").forEach((b) => b.classList.toggle("on", (state.tab === "news" && b.id === "newsBtn") || (state.tab === "tech" && b.id === "techBtn") || (state.tab === "jobs" && b.id === "jobsBtn") || (!isNewsTab() && b.id === "schBtn")));
   if (state.tab === "jobs") document.querySelectorAll(".tabs [data-tab]").forEach((x) => x.classList.remove("on")); // Jobs has no bottom tab
+  const jk = $("#jobKindBar"); if (jk) jk.classList.toggle("hidden", state.tab !== "jobs");
   const q = $("#q"); if (q) q.placeholder = state.tab === "news" ? "Search school news, e.g. UNILAG admission list…" : state.tab === "tech" ? "Search tech updates, e.g. AI, Starlink…" : state.tab === "jobs" ? "Search jobs, e.g. graduate trainee, Lagos, remote…" : "Search scholarships, e.g. PhD Canada…";
+}
+
+// ---------- Play Store update prompt (Google's in-app update sheet; only works for installs that came from Play) ----------
+const AppUpdate = Cap && Cap.Plugins && Cap.Plugins.AppUpdate;
+async function checkPlayUpdate() {
+  if (!isNative || !AppUpdate) return;
+  const last = +localStorage.getItem("upd:asked") || 0; if (Date.now() - last < 6 * 36e5) return;   // ask at most every 6 hours
+  try {
+    const info = await AppUpdate.getAppUpdateInfo();
+    if (info.updateAvailability !== 2) return;                           // 2 = UPDATE_AVAILABLE
+    localStorage.setItem("upd:asked", String(Date.now()));
+    if (info.flexibleUpdateAllowed) {
+      AppUpdate.addListener("onFlexibleUpdateStateChange", (st) => { if (st.installStatus === 11) {   // 11 = DOWNLOADED -> one tap to restart into the new version
+        hideBoostToast(); const t = document.createElement("div"); t.className = "toast in"; t.id = "toast";
+        t.innerHTML = '<div class="toast-tag">⬆️ Update ready</div><div class="toast-q" style="font-style:normal">The new ScholarHub version has downloaded. Restart to use it.</div><button class="boost-next" style="position:static;margin-top:8px" id="updNow">Restart now</button><button class="toast-x" aria-label="Later">✕</button>';
+        document.body.appendChild(t); t.querySelector("#updNow").onclick = () => AppUpdate.completeFlexibleUpdate(); t.querySelector(".toast-x").onclick = hideBoostToast; } });
+      await AppUpdate.startFlexibleUpdate();                            // Play shows its own "Update ScholarHub?" sheet; download continues in the background
+    } else if (info.immediateUpdateAllowed) await AppUpdate.performImmediateUpdate();   // full-screen Play update flow
+  } catch (e) { console.warn("update check", e); }
 }
 
 // ---------- Announcement (admin-managed: Supabase table `announcements`; RLS only exposes active rows in their date window) ----------
@@ -750,6 +771,7 @@ document.querySelectorAll(".tabs [data-tab]").forEach((b) => (b.onclick = () => 
 if ($("#schBtn")) $("#schBtn").onclick = () => document.querySelector('.tabs [data-tab="all"]').click();
 if ($("#newsBtn")) $("#newsBtn").onclick = () => document.querySelector('.tabs [data-tab="news"]').click();
 if ($("#techBtn")) $("#techBtn").onclick = () => document.querySelector('.tabs [data-tab="tech"]').click();
+if ($("#jobKind")) $("#jobKind").onchange = () => { state.jobKind = $("#jobKind").value; load(); window.scrollTo(0, 0); }; // category change: plain reload, no ad
 if ($("#jobsBtn")) $("#jobsBtn").onclick = () => { if (state.tab === "jobs") return; if (state.q) { state.q = ""; $("#q").value = ""; } state.tab = "jobs"; setMode(); load(); window.scrollTo(0, 0); maybeInterstitial(); };
 $("#filtersBtn").onclick = () => $("#sheet").classList.remove("hidden");
 $("#apply").onclick = () => { state.level = $("#fLevel").value; state.funding = $("#fFunding").value; state.tier = $("#fTier").value; state.country = $("#fCountry").value.trim(); state.added = +($("#fAdded").value || 0); state.dlFrom = $("#fFrom").value; state.dlTo = $("#fTo").value; state.expired = $("#fExpired").checked ? 1 : 0; $("#sheet").classList.add("hidden"); load(); };
@@ -818,8 +840,9 @@ async function init() {
   const startId = idFromUrl(location.href);
   if (startId) setTimeout(() => openById(startId), 300);
   if (CapApp && CapApp.addListener) {
-    CapApp.addListener("appUrlOpen", (ev) => { const id = idFromUrl(ev.url); if (id) openById(id); });
-    try { CapApp.getLaunchUrl().then((r) => { const id = r && r.url && idFromUrl(r.url); if (id) openById(id); }).catch(() => {}); } catch (e) {}
+    const openFromUrl = (u) => { let q; try { q = new URL(u).searchParams; } catch (e) { return; } if (q.get("s")) openById(q.get("s")); else if (q.get("n")) openNewsById(q.get("n")); }; // share links (?s=) and push-card taps (scholarhub://open?s= / ?n=)
+    CapApp.addListener("appUrlOpen", (ev) => openFromUrl(ev.url));
+    try { CapApp.getLaunchUrl().then((r) => { if (r && r.url) openFromUrl(r.url); }).catch(() => {}); } catch (e) {}
   }
   // notifications: react to taps, keep subscriptions in sync, offer once on the 2nd open
   async function openNewsById(ref) {
@@ -848,6 +871,7 @@ async function init() {
   if (LocalNotif && LocalNotif.addListener) LocalNotif.addListener("localNotificationActionPerformed", (ev) => openFromNotif(ev.notification && ev.notification.extra));
   // notifications are ON by default: ask Android's permission once, shortly after the first open
   if (isNative && !notif.asked) setTimeout(() => { askPermission().then(() => { applyDailyPush(); rescheduleAllDeadlines(); }); }, 3000);
+  setTimeout(checkPlayUpdate, 6000);   // "new version on Play" prompt, shortly after launch
   // motivation pop-ups: shortly after open, then every 5 minutes of use
   setTimeout(showBoostToast, 3000);
   setInterval(showBoostToast, 5 * 60 * 1000);
