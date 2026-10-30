@@ -40,8 +40,10 @@ def _send(project, token, topic, slot, title, body, image, data):
     msg = {"message": {"topic": topic,
                        "notification": {"title": title[:120], "body": body[:240], **({"image": image} if image else {})},
                        "data": {k: str(v) for k, v in data.items()},
-                       "android": {"priority": "high", "ttl": "10800s", "collapse_key": slot,
-                                   "notification": {"channel_id": "scholarhub_daily", "tag": slot, **({"image": image} if image else {}),
+                       # ttl 1 day: a phone that is off / in Doze still gets it when it wakes (3 h used to drop many overnight)
+                       # unique tag: pushes STACK in the shade like chat messages instead of overwriting the previous one of the same type
+                       "android": {"priority": "high", "ttl": "86400s",
+                                   "notification": {"channel_id": "scholarhub_daily", "tag": f"{slot}-{datetime.now(timezone.utc):%Y%m%d%H%M%S}", **({"image": image} if image else {}),
                                                     "notification_count": 1, "default_sound": True}}}}
     r = requests.post(f"https://fcm.googleapis.com/v1/projects/{project}/messages:send",
                       headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"}, json=msg, timeout=20)
