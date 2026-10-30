@@ -36,7 +36,31 @@ def _token(sa):
     creds.refresh(Request()); return creds.token
 
 
-def _send(project, token, topic, slot, title, body, image, data):
+def _img(url):
+    """Firebase only shows a picture if it is https, under 1 MB and hot-linkable. Most of ours are big WordPress/university
+    photos, so pass them through the free resizing mirror (same one the share card uses): small JPEG, always allowed."""
+    if not url or not str(url).startswith("http"): return None
+    url = str(url)
+    if re.search(r"https?://i[0-3]\.wp\.com/", url):           # WordPress.com CDN already resizes itself (the mirror refuses it)
+        return url.split("?")[0] + "?w=720&quality=80"
+    from urllib.parse import quote
+    return "https://images.weserv.nl/?url=" + quote(url, safe="") + "&w=720&h=720&fit=inside&output=jpg&q=80"
+
+
+def _post(project, token, msg, topic, slot):
+    r = requests.post(f"https://fcm.googleapis.com/v1/projects/{project}/messages:send",
+                      headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"}, json=msg, timeout=20)
+    if r.status_code != 200: log.warning("FCM %s/%s -> %s %s", topic, slot, r.status_code, r.text[:200])
+    return r.status_code == 200
+
+
+def _send(project, token, topic, slot, title, body, image, data, chip="", is_logo=False):
+    image = _img(image)
+    # 1) app 1.5.2+ (topic "<name>_v2"): DATA message – the app draws the card itself, picture visible in the banner
+    d2 = {k: str(v) for k, v in data.items()}
+    d2.update({"title": title[:120], "body": body[:240], "chip": chip, "is_logo": "1" if is_logo else "0", **({"image": image} if image else {})})
+    ok2 = _post(project, token, {"message": {"topic": topic + "_v2", "data": d2, "android": {"priority": "high", "ttl": "86400s"}}}, topic + "_v2", slot)
+    # 2) older versions (plain topic): standard Firebase notification
     msg = {"message": {"topic": topic,
                        "notification": {"title": title[:120], "body": body[:240], **({"image": image} if image else {})},
                        "data": {k: str(v) for k, v in data.items()},
@@ -45,10 +69,8 @@ def _send(project, token, topic, slot, title, body, image, data):
                        "android": {"priority": "high", "ttl": "86400s",
                                    "notification": {"channel_id": "scholarhub_daily", "tag": f"{slot}-{datetime.now(timezone.utc):%Y%m%d%H%M%S}", **({"image": image} if image else {}),
                                                     "notification_count": 1, "default_sound": True}}}}
-    r = requests.post(f"https://fcm.googleapis.com/v1/projects/{project}/messages:send",
-                      headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"}, json=msg, timeout=20)
-    if r.status_code != 200: log.warning("FCM %s/%s -> %s %s", topic, slot, r.status_code, r.text[:200])
-    return r.status_code == 200
+    ok1 = _post(project, token, msg, topic, slot)
+    return ok1 or ok2
 
 
 def _sent_ids(topic, slot=None, days=45):
@@ -131,7 +153,9 @@ def pick_scholarship(topic, region, closing=False):
     c = pref[0]; dl = _days_left(c.get("deadline") or "")
     chip = (f"⏳ Closes in {dl} days · " if dl is not None and 0 <= dl <= 14 else (f"📅 Deadline {c['deadline']} · " if c.get("deadline") else ""))
     title = ("⏰ " if closing else ("🆕 " if c.get("first_seen", "") >= (datetime.now(timezone.utc) - timedelta(hours=26)).isoformat() else "🎓 ")) + c["title"]
-    return {"id": c["id"], "title": title, "body": chip + _snippet(c["summary"]), "image": c.get("image") or c.get("logo"), "data": {"s": c["id"], "slot": "closing" if closing else "scholarship"}}
+    fund = (c.get("funding") or "").strip()
+    return {"id": c["id"], "title": title, "body": chip + _snippet(c["summary"]), "image": c.get("image") or c.get("logo"), "is_logo": not c.get("image") and bool(c.get("logo")),
+            "chip": ("Closing soon" if closing else "Scholarship") + (" · " + fund.capitalize() if fund else ""), "data": {"s": c["id"], "slot": "closing" if closing else "scholarship"}}
 
 
 def pick_news(topic, table):
@@ -148,8 +172,8 @@ def pick_news(topic, table):
         title = f"{tag} · {r.get('school') or r['source']}"
     else:
         title = "🤖 Tech Update · " + r["source"]
-    return {"id": r["id"], "title": title, "body": r["title"] + " — " + _snippet(r["summary"], 110), "image": r.get("image") or r.get("logo"),
-            "data": {"n": f"{table}:{r['id']}", "slot": "news" if table == "school_news" else "tech"}}
+    return {"id": r["id"], "title": title, "body": r["title"] + " — " + _snippet(r["summary"], 110), "image": r.get("image") or r.get("logo"), "is_logo": not r.get("image") and bool(r.get("logo")),
+            "chip": "School News" if table == "school_news" else "Tech Update", "data": {"n": f"{table}:{r['id']}", "slot": "news" if table == "school_news" else "tech"}}
 
 
 def pick_job(topic):
@@ -161,12 +185,12 @@ def pick_job(topic):
     pref = [r for r in rows if r.get("kind") in ("graduate", "internship", "ngo", "research")] or rows
     if not pref: return None
     r = pref[0]
-    tag = {"internship": "🎒 Internship", "graduate": "🎓 Graduate role", "research": "🔬 Research / Teaching", "ngo": "🤝 NGO job", "remote": "🌍 Remote job"}.get(r.get("kind") or "", "💼 Job")
+    tag = {"internship": "🎒 Internship", "graduate": "🎓 Graduate role", "research": "🔬 Research / Teaching", "ngo": "🤝 NGO job", "remote": "🌍 Remote job", "abroad": "✈️ Visa-sponsored job"}.get(r.get("kind") or "", "💼 Job")
     title = f"{tag} · {r.get('company') or r['source']}" + (f" · {r['location']}" if r.get("location") else "")
     dl = _days_left(r.get("deadline") or "")
     chip = f"⏳ Closes in {dl} days · " if dl is not None and 0 <= dl <= 14 else (f"📅 Closes {r['deadline']} · " if r.get("deadline") else "")
-    return {"id": r["id"], "title": title, "body": r["title"] + " — " + chip + _snippet(r["summary"], 100), "image": r.get("logo"),
-            "data": {"n": f"jobs:{r['id']}", "slot": "jobs"}}
+    return {"id": r["id"], "title": title, "body": r["title"] + " — " + chip + _snippet(r["summary"], 100), "image": r.get("logo"), "is_logo": bool(r.get("logo")),
+            "chip": tag.split(" ", 1)[1] if " " in tag else tag, "data": {"n": f"jobs:{r['id']}", "slot": "jobs"}}
 
 
 def run_slot(project, token, topic, slot, region):
@@ -176,7 +200,7 @@ def run_slot(project, token, topic, slot, region):
             "tech": lambda: pick_news(topic, "tech_news") or pick_scholarship(topic, region),
             "jobs": lambda: pick_job(topic) or pick_scholarship(topic, region)}[slot]()
     if not item: log.info("%s/%s: nothing to send", topic, slot); return False
-    ok = _send(project, token, topic, slot, item["title"], item["body"], item.get("image"), {**item["data"], "topic": topic})
+    ok = _send(project, token, topic, slot, item["title"], item["body"], item.get("image"), {**item["data"], "topic": topic}, item.get("chip", ""), item.get("is_logo", False))
     if ok: SB.table("notif_log").insert({"slot": slot, "topic": topic, "item_id": item["id"]}).execute()
     log.info("%s/%s -> %s | %s", topic, slot, "sent" if ok else "FAILED", item["title"][:70])
     return ok
@@ -204,7 +228,7 @@ def main():
     for topic in TOPICS:
         if force_topic and topic != force_topic: continue
         try:
-            ok = _send(project, token, topic, slot, item["title"], item["body"], item.get("image"), {**item["data"], "topic": topic})
+            ok = _send(project, token, topic, slot, item["title"], item["body"], item.get("image"), {**item["data"], "topic": topic}, item.get("chip", ""), item.get("is_logo", False))
             if ok: SB.table("notif_log").insert({"slot": slot, "topic": topic, "item_id": item["id"]}).execute(); sent += 1
         except Exception as e: log.warning("%s/%s failed: %s", topic, slot, e)
     log.info("%s -> %s | sent to %d audiences", slot, item["title"][:70], sent)
