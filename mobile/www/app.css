@@ -195,3 +195,5 @@ button.ghost{border-color:#cbd5e1;color:#334155}
 .ncard.has-img .ntype{background:rgba(255,255,255,.95)}
 .ndot{background:#059669;box-shadow:0 0 0 3px rgba(5,150,105,.2)}
 .hubbtn.jobs{background:#be185d;--sh:#831843}
+.jobkind{margin:0 12px 6px}.jobkind label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#475569}
+.jobkind select{flex:1;padding:8px 10px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;font:inherit;font-size:13px;font-weight:600}
