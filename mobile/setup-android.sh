@@ -38,7 +38,8 @@ fi
 # Android 13+ notification permission (push + deadline reminders)
 grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST" || sed -i 's#<application #<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application #' "$MANIFEST"
 [ -f android/app/google-services.json ] && echo "Firebase: google-services.json present" || echo "Firebase: no google-services.json (push disabled in this build)"
-# Push notification status-bar icon (white mortarboard) – embedded so no binary upload is needed
+# Push notification icon (white on transparent) + Firebase meta-data
+# push notification status-bar icon (white mortarboard) – embedded so no binary upload is needed
 mkdir -p android/app/src/main/res/drawable-mdpi && echo "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAcUlEQVR4nO2UMRLAIAgEj/z/z6TCIoCCSpEZrtFRvEVFgdbvxMyciacTYyJarl8GRDKegdyJ7FF4IDWwYzwDjc4NYwtUsgMxB4DHpAaqwzP9rlWA22qAkhSJtNcBcsmjjWYUMTXnopntfnZpVbz4Vq1eotMwHdHcxrsAAAAASUVORK5CYII=" | base64 -d > android/app/src/main/res/drawable-mdpi/ic_stat_push.png
 mkdir -p android/app/src/main/res/drawable-hdpi && echo "iVBORw0KGgoAAAANSUhEUgAAACQAAAAkCAYAAADhAJiYAAAAr0lEQVR4nO2W0Q6AIAgAofX/v0xPboZWgIi2cU+VgjdMJkCSJD+BiMgjD84QQURzXnOgpCIWMXWAZWs0YqKJXv8HwLfc66CnSLPwg1j340yRRoCJ3V4iRThFbLsKHU+TRnqJRaRwSoIiT1m3QpZEXvFiodEqSePFQlGkEIdv5TKhWqR+Xl4hznZCqt4ycvR7fajkq8dMzU4jpm2opi2TLhJyheV4X/LdWHmXSpJEwwUXmVAo8P8v5wAAAABJRU5ErkJggg==" | base64 -d > android/app/src/main/res/drawable-hdpi/ic_stat_push.png
 mkdir -p android/app/src/main/res/drawable-xhdpi && echo "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAA90lEQVR4nO2Yyw7DIAwEoer//zI9WaqWhIfZTaHy3EjAeAJxFFIKgiAIAiGllKKMn1WBrxLPOdPnowcceeJMEVogz1ZhiCwHYOzxFRH3QMXL6RGZHqCuKinNiQx3fCJxZESk2+EXiSMtkdsbOySOXIlUF3ZMHPkWOWoFUqpX4dXqqPj0e2jl8R4dvGsV6gpgsN2+A7dbiDWBOq5LwFaBJbKyui4BY1WEsS2XBIxZEeb7RBEweiKKQkAVMFBEWcEkAoYlvJp4a7xUgAEmj+3tBXqEgBqsaFXbG/jYn3rk2GMV5NiDLeTYo0XkqcNdObv+WwdBEAT/wQd1t4w5nSbu7QAAAABJRU5ErkJggg==" | base64 -d > android/app/src/main/res/drawable-xhdpi/ic_stat_push.png
@@ -58,4 +59,15 @@ sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 36/; s/targetSdkVersion
 grep -q suppressUnsupportedCompileSdk android/gradle.properties || echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
 echo "SDK: $(grep -E 'compileSdkVersion|targetSdkVersion' $VARS | tr -s ' ')"
 grep -q 'android.permission.INTERNET' "$MANIFEST" || sed -i 's#<manifest #<manifest xmlns:tools="http://schemas.android.com/tools" #' "$MANIFEST"
+# Push cards drawn by the app (picture visible in the heads-up banner): native/PushService.java + layouts
+JAVA_DIR=android/app/src/main/java/com/scholarhub/app
+mkdir -p "$JAVA_DIR" android/app/src/main/res/layout android/app/src/main/res/drawable
+cp native/PushService.java "$JAVA_DIR/PushService.java"
+cp native/push_banner.xml native/push_small.xml android/app/src/main/res/layout/
+cp native/push_chip.xml android/app/src/main/res/drawable/
+if ! grep -q 'PushService' "$MANIFEST"; then
+  sed -i 's#</application>#    <service android:name=".PushService" android:exported="false">\n        <intent-filter android:priority="100"><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter>\n    </service>\n    </application>#' "$MANIFEST"
+fi
+grep -q 'firebase-messaging' "$GRADLE" || sed -i 's#^dependencies {#dependencies {\n    implementation platform("com.google.firebase:firebase-bom:33.7.0")\n    implementation "com.google.firebase:firebase-messaging"#' "$GRADLE"
+echo "Push card service installed: $(grep -c PushService "$MANIFEST") manifest entry"
 echo "Done. Now: npx cap sync android && cd android && ./gradlew assembleDebug"
