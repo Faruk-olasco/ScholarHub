@@ -18,7 +18,7 @@ window.ADMOB = {
 };
 
 // 3) Links shown in the app
-window.SHARE_URL = "https://faruk-olasco.github.io/ScholarHub";
+window.SHARE_URL = "https://scholarhub.smartaiintel.com";
 window.PRIVACY_URL = "https://faruk-olasco.github.io/ScholarHub/privacy.html";
 
 // 4) ADMIN. Tap the ScholarHub logo 7 times and enter this PIN to open the admin screen
