@@ -39,58 +39,60 @@ async function cardImage(i) {
   try { return drawCard(i, photo, logo); } catch (e) { return drawCard(i, null, null); } // picture host without CORS \u2192 card without picture
 }
 function drawCard(i, photo, logo) {
+  // Phone-shaped card, laid out like the detail sheet: picture on top, title, deadline, pills, summary, source, the four actions.
+  // Used as the link-preview picture (uploaded to Supabase Storage "cards"), so WhatsApp/Telegram/X draw it under the shared link.
   const sec = i._sec || ""; const isJob = sec === "jobs", isNews = sec === "news" || sec === "tech";
-  const W = 1080, P = 56, c = document.createElement("canvas"), x = c.getContext("2d");
+  const W = 1080, P = 36, c = document.createElement("canvas"), x = c.getContext("2d");
   const font = (px, w = 400) => (x.font = `${w} ${px}px system-ui, Roboto, "Noto Color Emoji", sans-serif`);
-  const wrap = (txt, px, w, maxW, maxLines) => { font(px, w); const out = []; let line = ""; for (const word of String(txt || "").split(/\s+/)) { const t = line ? line + " " + word : word; if (x.measureText(t).width > maxW && line) { out.push(line); line = word; if (out.length === maxLines) break; } else line = t; } if (out.length < maxLines && line) out.push(line); if (out.length === maxLines && x.measureText(out[maxLines - 1]).width > maxW - 30) out[maxLines - 1] = out[maxLines - 1].replace(/\s?\S*$/, "") + "\u2026"; return out; };
+  const wrap = (txt, px, w, maxW, maxLines) => { font(px, w); const out = []; let line = ""; for (const word of String(txt || "").split(/\s+/)) { const t = line ? line + " " + word : word; if (x.measureText(t).width > maxW && line) { out.push(line); line = word; if (out.length === maxLines) break; } else line = t; } if (out.length < maxLines && line) out.push(line); if (out.length === maxLines && line && !out.includes(line)) out[maxLines - 1] = out[maxLines - 1].replace(/\s*\S*$/, "") + "\u2026"; return out; };
   const rr = (X, Y, w, h, r, fill, stroke) => { x.beginPath(); x.roundRect(X, Y, w, h, r); if (fill) { x.fillStyle = fill; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.lineWidth = 2; x.stroke(); } };
-  // measure first
-  const titleLines = wrap(i.title, 50, 800, W - 2 * P, 4);
-  const sumLines = wrap(i.summary, 32, 400, W - 2 * P, 4);
+  const L = P + 24, R = W - P - 24, CW = R - L;
+  const titleLines = wrap(i.title, 48, 800, CW, 3);
+  const sumLines = wrap(i.summary, 28, 400, CW, 4);
   const kindTxt = (KIND_PILL[i.kind] || [])[0];
-  const tagList = sec ? [kindTxt, i.company, i.location, i.school].filter(Boolean) : [i.tier === "official" ? "\ud83c\udfdb official" : "", i.funding, ...(i.levels || "").split(", ").filter(Boolean).slice(0, 2), ...(i.countries || "").split(", ").filter(Boolean).slice(0, 2)].filter(Boolean);
+  const pills1 = sec ? [kindTxt, i.company, i.location, i.school].filter(Boolean) : [...(i.levels || "").split(", ").filter(Boolean).slice(0, 2), i.funding, ...(i.regions || "").split(", ").filter(Boolean).slice(0, 2)].filter(Boolean);
+  const pills2 = sec ? [] : (i.countries || "").split(", ").filter(Boolean).slice(0, 3);
   let days = null, dlTxt = isNews ? "" : isJob ? "\ud83d\udfe2 Open \u2014 apply now" : "\ud83d\udfe2 Open \u2014 apply now (no deadline stated)", dlCol = "#047857";
-  if (i.deadline) { days = Math.round((new Date(i.deadline) - new Date().setHours(0, 0, 0, 0)) / 864e5); dlTxt = `\u23f0 ${isJob ? "Closes" : "Deadline"} ${i.deadline} (${days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left"})`; dlCol = days < 0 ? "#b91c1c" : days <= 14 ? "#b45309" : "#047857"; }
-  const imgH = photo ? 460 : logo ? 240 : 0;
-  const H = 150 + imgH + titleLines.length * 62 + 60 + sumLines.length * 44 + (tagList.length ? 80 : 20) + 60 + 232 + 150;
+  if (i.deadline) { days = Math.round((new Date(i.deadline) - new Date().setHours(0, 0, 0, 0)) / 864e5); dlTxt = `\u23f0 ${isJob ? "Closes" : "Deadline"} ${i.deadline} (${days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left"})`; dlCol = days < 0 ? "#b91c1c" : days <= 14 ? "#c2410c" : "#047857"; }
+  const imgH = photo ? 460 : logo ? 300 : 0;
+  const pillRow = (list, y) => { let xx = L; font(26, 400); for (const t of list) { const w = x.measureText(t).width + 40; if (xx + w > R) break; rr(xx, y, w, 50, 25, "#f1f5f9", "#cbd5e1"); x.fillStyle = "#334155"; x.fillText(t, xx + 20, y + 34); xx += w + 14; } return y + 64; };
+  const H = P + 100 + imgH + 36 + titleLines.length * 58 + (dlTxt ? 66 : 10) + (pills1.length ? 64 : 0) + (pills2.length ? 64 : 0) + 12 + sumLines.length * 40 + 14 + 40 + 56 + 68 + 16 + 68 + 40 + P;
   c.width = W; c.height = H;
   x.fillStyle = "#f1f5f9"; x.fillRect(0, 0, W, H);
-  // header
-  font(40, 800); x.fillStyle = "#0f172a"; x.fillText("\ud83c\udf93 Scholar", P, 80); const sw = x.measureText("\ud83c\udf93 Scholar").width; x.fillStyle = "#0284c7"; x.fillText("Hub", P + sw, 80);
-  font(26, 700); x.fillStyle = "#059669"; x.textAlign = "right"; x.fillText("\u25cf LIVE", W - P, 76); x.textAlign = "left";
-  // card
-  const cy = 120, cw = W - 2 * P + 40; rr(P - 20, cy, cw, H - cy - 130, 28, "#ffffff", "#e2e8f0");
-  if (imgH) { // picture: full card width, cropped to fill; logo: large, centred on a light panel
-    x.save(); x.beginPath(); x.roundRect(P - 20, cy, cw, imgH, [28, 28, 0, 0]); x.clip();
-    if (photo) { const s = Math.max(cw / photo.naturalWidth, imgH / photo.naturalHeight), dw = photo.naturalWidth * s, dh = photo.naturalHeight * s; x.drawImage(photo, P - 20 + (cw - dw) / 2, cy + (imgH - dh) / 2, dw, dh); }
-    else { x.fillStyle = "#ffffff"; x.fillRect(P - 20, cy, cw, imgH); const s = Math.min((cw - 120) / logo.naturalWidth, (imgH - 60) / logo.naturalHeight), dw = logo.naturalWidth * s, dh = logo.naturalHeight * s; x.drawImage(logo, P - 20 + (cw - dw) / 2, cy + (imgH - dh) / 2, dw, dh); }
-    x.restore();
+  rr(P, P, W - 2 * P, H - 2 * P, 40, "#ffffff", "#e2e8f0");
+  // header: ScholarHub + LIVE
+  font(36, 800); x.fillStyle = "#0f172a"; x.fillText("\ud83c\udf93 Scholar", P + 28, P + 66); const sw = x.measureText("\ud83c\udf93 Scholar").width; x.fillStyle = "#0284c7"; x.fillText("Hub", P + 28 + sw, P + 66);
+  font(28, 700); x.fillStyle = "#059669"; x.textAlign = "right"; x.fillText("\u25cf LIVE", W - P - 28, P + 64); x.textAlign = "left";
+  // picture / logo
+  let y = P + 100;
+  if (imgH) {
+    x.save(); x.beginPath(); x.roundRect(L, y, CW, imgH, 28); x.clip();
+    if (photo) { const s = Math.max(CW / photo.naturalWidth, imgH / photo.naturalHeight), dw = photo.naturalWidth * s, dh = photo.naturalHeight * s; x.drawImage(photo, L + (CW - dw) / 2, y + (imgH - dh) / 2, dw, dh); }
+    else { x.fillStyle = "#ffffff"; x.fillRect(L, y, CW, imgH); const s = Math.min((CW - 120) / logo.naturalWidth, (imgH - 60) / logo.naturalHeight), dw = logo.naturalWidth * s, dh = logo.naturalHeight * s; x.drawImage(logo, L + (CW - dw) / 2, y + (imgH - dh) / 2, dw, dh); }
+    x.restore(); y += imgH;
   }
-  let y = cy + imgH + 80; font(50, 800); x.fillStyle = "#0f172a"; for (const l of titleLines) { x.fillText(l, P + 10, y); y += 62; }
-  if (dlTxt) { y += 6; font(30, 700); x.fillStyle = dlCol; x.fillText(dlTxt, P + 10, y); y += 54; } else y += 10;
-  font(32, 400); x.fillStyle = "#475569"; for (const l of sumLines) { x.fillText(l, P + 10, y); y += 44; }
-  if (tagList.length) { y += 12; let tx = P + 10; font(26, 600); for (const t of tagList) { const w = x.measureText(t).width + 36; if (tx + w > W - P) break; rr(tx, y - 30, w, 46, 23, "#f1f5f9", "#e2e8f0"); x.fillStyle = t === i.funding ? "#047857" : t.startsWith("\ud83c\udfdb") ? "#6d28d9" : "#334155"; x.fillText(t, tx + 18, y + 2); tx += w + 12; } y += 60; }
-  font(26, 400); x.fillStyle = "#64748b"; x.fillText(`via ${i.source || ""}`, P + 10, y + 10);
-  // official link shown as plain text (proof of source; an image can't be tapped)
-  font(24, 400); x.fillStyle = "#0369a1"; let link = String(i.url || "").replace(/^https?:\/\//, ""); while (x.measureText(link).width > W - 2 * P - 20 && link.length > 10) link = link.slice(0, -2); if (link !== String(i.url || "").replace(/^https?:\/\//, "")) link += "\u2026"; x.fillText("\ud83d\udd17 " + link, P + 10, y + 50);
-  // action buttons, exactly like the detail screen (shows the tracking features)
-  const btn = (X, Y, w, label, filled) => { rr(X, Y, w, 64, 16, filled ? "#0284c7" : "#ffffff", filled ? null : "#cbd5e1"); font(26, 700); x.fillStyle = filled ? "#ffffff" : "#334155"; x.textAlign = "center"; x.fillText(label, X + w / 2, Y + 41); x.textAlign = "left"; };
-  const bx = P + 10, bw = W - 2 * P - 20, g = 14; y += 90;
-  const w3 = (bw - 2 * g) / 3; btn(bx, y, w3, "\u2606 Save", false); btn(bx + w3 + g, y, w3, "Share", false); btn(bx + 2 * (w3 + g), y, w3, isJob ? "Apply on site \u2197" : isNews ? "Read on site \u2197" : "Apply / Details \u2197", true);
-  y += 64 + g; const w2 = (bw - g) / 2; btn(bx, y, w2, "\uff0b Add to plan", false); btn(bx + w2 + g, y, w2, "\ud83d\udcdd Add to opportunity note", false);
-  // footer: Play Store call-to-action
-  const fy = H - 100; rr(P, fy, W - 2 * P, 70, 18, "#0284c7"); font(30, 800); x.fillStyle = "#ffffff"; x.textAlign = "center"; const lbl = "Get ScholarHub free on Google Play"; const lw = x.measureText(lbl).width; x.fillText(lbl, W / 2 + 22, fy + 46); x.textAlign = "left";
-  // drawn down-arrow (not an emoji, so it shows on every device): points to the link under the picture
-  const ax = W / 2 - lw / 2 - 20, ay = fy + 35; x.fillStyle = "#ffffff"; x.fillRect(ax - 6, ay - 20, 12, 24); x.beginPath(); x.moveTo(ax - 16, ay + 2); x.lineTo(ax + 16, ay + 2); x.lineTo(ax, ay + 20); x.closePath(); x.fill();
+  y += 36 + 48; font(48, 800); x.fillStyle = "#0f172a"; for (const l of titleLines) { x.fillText(l, L, y); y += 58; }
+  if (dlTxt) { y += 4; font(32, 700); x.fillStyle = dlCol; x.fillText(dlTxt, L, y); y += 30; } else y -= 20;
+  y += 12; if (pills1.length) y = pillRow(pills1, y); if (pills2.length) y = pillRow(pills2, y);
+  y += 12 + 28; font(28, 400); x.fillStyle = "#334155"; for (const l of sumLines) { x.fillText(l, L, y); y += 40; }
+  y += 14; font(26, 400); x.fillStyle = "#64748b"; x.fillText(`Source: ${i.source || ""}`, L, y);
+  // the four actions, like the detail screen
+  y += 56 - 28;
+  const btn = (X, Y, w, label, filled) => { rr(X, Y, w, 68, 18, filled ? "#0284c7" : "#ffffff", filled ? null : "#cbd5e1"); font(27, 700); x.fillStyle = filled ? "#ffffff" : "#334155"; x.textAlign = "center"; x.fillText(label, X + w / 2, Y + 44); x.textAlign = "left"; };
+  const g = 16, bw = (CW - g) / 2;
+  btn(L, y, bw, "\u2606 Save", false); btn(L + bw + g, y, bw, "\uff0b Add to plan", false); y += 68 + g;
+  btn(L, y, bw, "\u270e Opportunity note", false); btn(L + bw + g, y, bw, isJob ? "Apply on site \u2197" : isNews ? "Read on site \u2197" : "Apply / Details \u2197", true);
   return c.toDataURL("image/png");
 }
-function shareText(i) {
-  const sec = i._sec || "";
-  const who = i.school ? "\n" + i.school : i.company ? "\n" + i.company + (i.location ? " \u00b7 " + i.location : "") : "";
-  const when = i.deadline ? "\n\u23f0 " + (sec === "jobs" ? "Closes " : "Deadline: ") + i.deadline : "";
-  const tail = "\n\n\ud83d\udc49 Open in ScholarHub: " + shareLink(i) + "\n\n\ud83d\udcf2 Don't have the app? Get it free on Google Play:\n" + PLAY_URL;
-  return (sec === "news" ? "\ud83c\udfeb " : sec === "tech" ? "\ud83d\udcbb " : sec === "jobs" ? "\ud83d\udcbc " : "\ud83c\udf93 ") + i.title + who + when + tail;
+// Upload the drawn card to Supabase Storage (public bucket "cards") so the share link's preview shows it. One file per item, replaced on every share.
+const cardPath = (i) => (i._sec === "jobs" ? "jobs" : i._sec === "tech" ? "tech_news" : i._sec === "news" ? "school_news" : "s") + "/" + encodeURIComponent(i.id) + ".png";
+async function uploadCard(i) {
+  const dataUrl = await cardImage(i);
+  const blob = await (await fetch(dataUrl)).blob();
+  const r = await fetch((window.SUPABASE_URL || "").replace(/\/$/, "") + "/storage/v1/object/cards/" + cardPath(i), { method: "POST", headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: "Bearer " + window.SUPABASE_ANON_KEY, "Content-Type": "image/png", "x-upsert": "true" }, body: blob });
+  if (!r.ok) throw new Error("card upload " + r.status);
 }
+function shareText(i) { return shareLink(i); } // link only: the chat app draws the ScholarHub card from the link (title, deadline, picture come from the site)
 let shareBusy = false;
 async function shareItem(i) {
   if (shareBusy) return; shareBusy = true;
@@ -98,6 +100,8 @@ async function shareItem(i) {
   // tweet-style preview card themselves from the link (title, description and picture come from the site).
   const text = shareText(i), title = i.title, dialogTitle = "Share";
   try {
+    // draw + upload the preview card first (best effort, max 8 s) so the chat app finds it when it reads the link
+    try { await Promise.race([uploadCard(i), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000))]); } catch (e) { console.warn("card", e); }
     try { if (Share && Share.share) return await Share.share({ title, text, dialogTitle }); } catch (e) { if (/cancel/i.test(String(e && (e.message || e.code || e)))) return; }
     try { if (navigator.share) return await navigator.share({ title, text }); } catch (e) { if (/abort/i.test(String(e))) return; }
     try { await navigator.clipboard.writeText(text); alert("Copied"); } catch (e) { prompt("Copy", text); }
