@@ -76,15 +76,5 @@ sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 36/; s/targetSdkVersion
 grep -q suppressUnsupportedCompileSdk android/gradle.properties || echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
 echo "SDK: $(grep -E 'compileSdkVersion|targetSdkVersion' $VARS | tr -s ' ')"
 grep -q 'android.permission.INTERNET' "$MANIFEST" || sed -i 's#<manifest #<manifest xmlns:tools="http://schemas.android.com/tools" #' "$MANIFEST"
-# Push cards drawn by the app (picture visible in the heads-up banner): native/PushService.java + layouts
-JAVA_DIR=android/app/src/main/java/com/scholarhub/app
-mkdir -p "$JAVA_DIR" android/app/src/main/res/layout android/app/src/main/res/drawable
-cp native/PushService.java "$JAVA_DIR/PushService.java"
-cp native/push_banner.xml native/push_small.xml android/app/src/main/res/layout/
-cp native/push_chip.xml android/app/src/main/res/drawable/
-if ! grep -q 'PushService' "$MANIFEST"; then
-  sed -i 's#</application>#    <service android:name=".PushService" android:exported="false">\n        <intent-filter android:priority="100"><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter>\n    </service>\n    </application>#' "$MANIFEST"
-fi
 grep -q 'firebase-messaging' "$GRADLE" || sed -i 's#^dependencies {#dependencies {\n    implementation platform("com.google.firebase:firebase-bom:33.7.0")\n    implementation "com.google.firebase:firebase-messaging"#' "$GRADLE"
-echo "Push card service installed: $(grep -c PushService "$MANIFEST") manifest entry"
 echo "Done. Now: npx cap sync android && cd android && ./gradlew assembleDebug"
