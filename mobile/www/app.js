@@ -1,4 +1,4 @@
-/* ScholarHub mobile â€“ vanilla JS, talks to Supabase, AdMob via Capacitor plugin. */
+/* ScholarHub mobile \u2013 vanilla JS, talks to Supabase, AdMob via Capacitor plugin. */
 const SB_URL = (window.SUPABASE_URL || "").replace(/\/$/, "") + "/rest/v1";
 const SB_HEADERS = { apikey: window.SUPABASE_ANON_KEY, Authorization: "Bearer " + window.SUPABASE_ANON_KEY, Accept: "application/json" };
 const FILTERS = {
@@ -36,28 +36,28 @@ const loadImg = (u) => new Promise((res) => { if (!u) return res(null); const im
 const loadImgAny = async (u) => (u ? (await loadImg(u)) || (await loadImg("https://images.weserv.nl/?url=" + encodeURIComponent(u.replace(/^https?:\/\//, "")) + "&w=1080&output=png")) : null);
 async function cardImage(i) {
   const photo = await loadImgAny(i.image), logo = photo ? null : await loadImgAny(i.logo);
-  try { return drawCard(i, photo, logo); } catch (e) { return drawCard(i, null, null); } // picture host without CORS â†’ card without picture
+  try { return drawCard(i, photo, logo); } catch (e) { return drawCard(i, null, null); } // picture host without CORS \u2192 card without picture
 }
 function drawCard(i, photo, logo) {
   const sec = i._sec || ""; const isJob = sec === "jobs", isNews = sec === "news" || sec === "tech";
   const W = 1080, P = 56, c = document.createElement("canvas"), x = c.getContext("2d");
   const font = (px, w = 400) => (x.font = `${w} ${px}px system-ui, Roboto, "Noto Color Emoji", sans-serif`);
-  const wrap = (txt, px, w, maxW, maxLines) => { font(px, w); const out = []; let line = ""; for (const word of String(txt || "").split(/\s+/)) { const t = line ? line + " " + word : word; if (x.measureText(t).width > maxW && line) { out.push(line); line = word; if (out.length === maxLines) break; } else line = t; } if (out.length < maxLines && line) out.push(line); if (out.length === maxLines && x.measureText(out[maxLines - 1]).width > maxW - 30) out[maxLines - 1] = out[maxLines - 1].replace(/\s?\S*$/, "") + "â€¦"; return out; };
+  const wrap = (txt, px, w, maxW, maxLines) => { font(px, w); const out = []; let line = ""; for (const word of String(txt || "").split(/\s+/)) { const t = line ? line + " " + word : word; if (x.measureText(t).width > maxW && line) { out.push(line); line = word; if (out.length === maxLines) break; } else line = t; } if (out.length < maxLines && line) out.push(line); if (out.length === maxLines && x.measureText(out[maxLines - 1]).width > maxW - 30) out[maxLines - 1] = out[maxLines - 1].replace(/\s?\S*$/, "") + "\u2026"; return out; };
   const rr = (X, Y, w, h, r, fill, stroke) => { x.beginPath(); x.roundRect(X, Y, w, h, r); if (fill) { x.fillStyle = fill; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.lineWidth = 2; x.stroke(); } };
   // measure first
   const titleLines = wrap(i.title, 50, 800, W - 2 * P, 4);
   const sumLines = wrap(i.summary, 32, 400, W - 2 * P, 4);
   const kindTxt = (KIND_PILL[i.kind] || [])[0];
-  const tagList = sec ? [kindTxt, i.company, i.location, i.school].filter(Boolean) : [i.tier === "official" ? "ðŸ› official" : "", i.funding, ...(i.levels || "").split(", ").filter(Boolean).slice(0, 2), ...(i.countries || "").split(", ").filter(Boolean).slice(0, 2)].filter(Boolean);
-  let days = null, dlTxt = isNews ? "" : isJob ? "ðŸŸ¢ Open â€” apply now" : "ðŸŸ¢ Open â€” apply now (no deadline stated)", dlCol = "#047857";
-  if (i.deadline) { days = Math.round((new Date(i.deadline) - new Date().setHours(0, 0, 0, 0)) / 864e5); dlTxt = `â° ${isJob ? "Closes" : "Deadline"} ${i.deadline} (${days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left"})`; dlCol = days < 0 ? "#b91c1c" : days <= 14 ? "#b45309" : "#047857"; }
+  const tagList = sec ? [kindTxt, i.company, i.location, i.school].filter(Boolean) : [i.tier === "official" ? "\ud83c\udfdb official" : "", i.funding, ...(i.levels || "").split(", ").filter(Boolean).slice(0, 2), ...(i.countries || "").split(", ").filter(Boolean).slice(0, 2)].filter(Boolean);
+  let days = null, dlTxt = isNews ? "" : isJob ? "\ud83d\udfe2 Open \u2014 apply now" : "\ud83d\udfe2 Open \u2014 apply now (no deadline stated)", dlCol = "#047857";
+  if (i.deadline) { days = Math.round((new Date(i.deadline) - new Date().setHours(0, 0, 0, 0)) / 864e5); dlTxt = `\u23f0 ${isJob ? "Closes" : "Deadline"} ${i.deadline} (${days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left"})`; dlCol = days < 0 ? "#b91c1c" : days <= 14 ? "#b45309" : "#047857"; }
   const imgH = photo ? 460 : logo ? 240 : 0;
   const H = 150 + imgH + titleLines.length * 62 + 60 + sumLines.length * 44 + (tagList.length ? 80 : 20) + 60 + 232 + 150;
   c.width = W; c.height = H;
   x.fillStyle = "#f1f5f9"; x.fillRect(0, 0, W, H);
   // header
-  font(40, 800); x.fillStyle = "#0f172a"; x.fillText("ðŸŽ“ Scholar", P, 80); const sw = x.measureText("ðŸŽ“ Scholar").width; x.fillStyle = "#0284c7"; x.fillText("Hub", P + sw, 80);
-  font(26, 700); x.fillStyle = "#059669"; x.textAlign = "right"; x.fillText("â— LIVE", W - P, 76); x.textAlign = "left";
+  font(40, 800); x.fillStyle = "#0f172a"; x.fillText("\ud83c\udf93 Scholar", P, 80); const sw = x.measureText("\ud83c\udf93 Scholar").width; x.fillStyle = "#0284c7"; x.fillText("Hub", P + sw, 80);
+  font(26, 700); x.fillStyle = "#059669"; x.textAlign = "right"; x.fillText("\u25cf LIVE", W - P, 76); x.textAlign = "left";
   // card
   const cy = 120, cw = W - 2 * P + 40; rr(P - 20, cy, cw, H - cy - 130, 28, "#ffffff", "#e2e8f0");
   if (imgH) { // picture: full card width, cropped to fill; logo: large, centred on a light panel
@@ -69,15 +69,15 @@ function drawCard(i, photo, logo) {
   let y = cy + imgH + 80; font(50, 800); x.fillStyle = "#0f172a"; for (const l of titleLines) { x.fillText(l, P + 10, y); y += 62; }
   if (dlTxt) { y += 6; font(30, 700); x.fillStyle = dlCol; x.fillText(dlTxt, P + 10, y); y += 54; } else y += 10;
   font(32, 400); x.fillStyle = "#475569"; for (const l of sumLines) { x.fillText(l, P + 10, y); y += 44; }
-  if (tagList.length) { y += 12; let tx = P + 10; font(26, 600); for (const t of tagList) { const w = x.measureText(t).width + 36; if (tx + w > W - P) break; rr(tx, y - 30, w, 46, 23, "#f1f5f9", "#e2e8f0"); x.fillStyle = t === i.funding ? "#047857" : t.startsWith("ðŸ›") ? "#6d28d9" : "#334155"; x.fillText(t, tx + 18, y + 2); tx += w + 12; } y += 60; }
+  if (tagList.length) { y += 12; let tx = P + 10; font(26, 600); for (const t of tagList) { const w = x.measureText(t).width + 36; if (tx + w > W - P) break; rr(tx, y - 30, w, 46, 23, "#f1f5f9", "#e2e8f0"); x.fillStyle = t === i.funding ? "#047857" : t.startsWith("\ud83c\udfdb") ? "#6d28d9" : "#334155"; x.fillText(t, tx + 18, y + 2); tx += w + 12; } y += 60; }
   font(26, 400); x.fillStyle = "#64748b"; x.fillText(`via ${i.source || ""}`, P + 10, y + 10);
   // official link shown as plain text (proof of source; an image can't be tapped)
-  font(24, 400); x.fillStyle = "#0369a1"; let link = String(i.url || "").replace(/^https?:\/\//, ""); while (x.measureText(link).width > W - 2 * P - 20 && link.length > 10) link = link.slice(0, -2); if (link !== String(i.url || "").replace(/^https?:\/\//, "")) link += "â€¦"; x.fillText("ðŸ”— " + link, P + 10, y + 50);
+  font(24, 400); x.fillStyle = "#0369a1"; let link = String(i.url || "").replace(/^https?:\/\//, ""); while (x.measureText(link).width > W - 2 * P - 20 && link.length > 10) link = link.slice(0, -2); if (link !== String(i.url || "").replace(/^https?:\/\//, "")) link += "\u2026"; x.fillText("\ud83d\udd17 " + link, P + 10, y + 50);
   // action buttons, exactly like the detail screen (shows the tracking features)
   const btn = (X, Y, w, label, filled) => { rr(X, Y, w, 64, 16, filled ? "#0284c7" : "#ffffff", filled ? null : "#cbd5e1"); font(26, 700); x.fillStyle = filled ? "#ffffff" : "#334155"; x.textAlign = "center"; x.fillText(label, X + w / 2, Y + 41); x.textAlign = "left"; };
   const bx = P + 10, bw = W - 2 * P - 20, g = 14; y += 90;
-  const w3 = (bw - 2 * g) / 3; btn(bx, y, w3, "â˜† Save", false); btn(bx + w3 + g, y, w3, "Share", false); btn(bx + 2 * (w3 + g), y, w3, isJob ? "Apply on site â†—" : isNews ? "Read on site â†—" : "Apply / Details â†—", true);
-  y += 64 + g; const w2 = (bw - g) / 2; btn(bx, y, w2, "ï¼‹ Add to plan", false); btn(bx + w2 + g, y, w2, "ðŸ“ Add to opportunity note", false);
+  const w3 = (bw - 2 * g) / 3; btn(bx, y, w3, "\u2606 Save", false); btn(bx + w3 + g, y, w3, "Share", false); btn(bx + 2 * (w3 + g), y, w3, isJob ? "Apply on site \u2197" : isNews ? "Read on site \u2197" : "Apply / Details \u2197", true);
+  y += 64 + g; const w2 = (bw - g) / 2; btn(bx, y, w2, "\uff0b Add to plan", false); btn(bx + w2 + g, y, w2, "\ud83d\udcdd Add to opportunity note", false);
   // footer: Play Store call-to-action
   const fy = H - 100; rr(P, fy, W - 2 * P, 70, 18, "#0284c7"); font(30, 800); x.fillStyle = "#ffffff"; x.textAlign = "center"; const lbl = "Get ScholarHub free on Google Play"; const lw = x.measureText(lbl).width; x.fillText(lbl, W / 2 + 22, fy + 46); x.textAlign = "left";
   // drawn down-arrow (not an emoji, so it shows on every device): points to the link under the picture
@@ -86,10 +86,10 @@ function drawCard(i, photo, logo) {
 }
 function shareText(i) {
   const sec = i._sec || "";
-  const who = i.school ? "\n" + i.school : i.company ? "\n" + i.company + (i.location ? " Â· " + i.location : "") : "";
-  const when = i.deadline ? "\nâ° " + (sec === "jobs" ? "Closes " : "Deadline: ") + i.deadline : "";
-  const tail = "\n\nðŸ‘‰ Open in ScholarHub: " + shareLink(i) + "\n\nðŸ“² Don't have the app? Get it free on Google Play:\n" + PLAY_URL;
-  return (sec === "news" ? "ðŸ« " : sec === "tech" ? "ðŸ’» " : sec === "jobs" ? "ðŸ’¼ " : "ðŸŽ“ ") + i.title + who + when + tail;
+  const who = i.school ? "\n" + i.school : i.company ? "\n" + i.company + (i.location ? " \u00b7 " + i.location : "") : "";
+  const when = i.deadline ? "\n\u23f0 " + (sec === "jobs" ? "Closes " : "Deadline: ") + i.deadline : "";
+  const tail = "\n\n\ud83d\udc49 Open in ScholarHub: " + shareLink(i) + "\n\n\ud83d\udcf2 Don't have the app? Get it free on Google Play:\n" + PLAY_URL;
+  return (sec === "news" ? "\ud83c\udfeb " : sec === "tech" ? "\ud83d\udcbb " : sec === "jobs" ? "\ud83d\udcbc " : "\ud83c\udf93 ") + i.title + who + when + tail;
 }
 let shareBusy = false;
 async function shareItem(i) {
@@ -112,8 +112,8 @@ async function shareItem(i) {
         if (navigator.canShare({ files: [file] })) { await navigator.share({ title, text, files: [file] }); return; }
       }
     } catch (e) { if (/abort/i.test(String(e))) return; }
-    // 3) fallbacks: text only â€“ and say why, so the problem can be reported
-    if (imgErr) showToast("â„¹ï¸ Shared as text", "Card picture could not be attached: " + imgErr.slice(0, 120));
+    // 3) fallbacks: text only \u2013 and say why, so the problem can be reported
+    if (imgErr) showToast("\u2139\ufe0f Shared as text", "Card picture could not be attached: " + imgErr.slice(0, 120));
     try { if (Share && Share.share) return await Share.share({ title, text, dialogTitle }); } catch (e) {}
     try { if (navigator.share) return await navigator.share({ title, text }); } catch (e) {}
     try { await navigator.clipboard.writeText(text); alert("Copied"); } catch (e) { prompt("Copy", text); }
@@ -175,8 +175,8 @@ async function scheduleDeadline(i) {
     const at = new Date(dl.getTime() - d * 864e5);
     if (at <= new Date()) continue;
     const left = d === 0 ? `${word} TODAY` : d === 1 ? `${word} tomorrow` : `${d} days left`;
-    list.push({ id: nid(i.id, d), title: `â° ${left} Â· ${i.title.slice(0, 60)}`, body: `${word} ${nice} â€” ${i.title.slice(0, 120)}`,
-      largeBody: `${i.title}\n${word}: ${nice}. Tap to open the card, apply or add a note.`, summaryText: "ScholarHub Â· Deadline reminder",
+    list.push({ id: nid(i.id, d), title: `\u23f0 ${left} \u00b7 ${i.title.slice(0, 60)}`, body: `${word} ${nice} \u2014 ${i.title.slice(0, 120)}`,
+      largeBody: `${i.title}\n${word}: ${nice}. Tap to open the card, apply or add a note.`, summaryText: "ScholarHub \u00b7 Deadline reminder",
       schedule: { at, allowWhileIdle: true }, extra: { s: i.id }, smallIcon: "ic_stat_push", channelId: "scholarhub_deadlines" });
   }
   if (list.length) { try { await LocalNotif.schedule({ notifications: list }); } catch (e) { console.warn("schedule", e); } }
@@ -205,7 +205,7 @@ async function initAds() {
   if (!isNative || !AdMob) return;
   try {
     await AdMob.initialize({ initializeForTesting: window.ADMOB.testing });
-    // Consent (GDPR/UMP) â€“ required by Google for EEA users
+    // Consent (GDPR/UMP) \u2013 required by Google for EEA users
     try {
       const consent = await AdMob.requestConsentInfo();
       if (consent.isConsentFormAvailable && consent.status === "REQUIRED") await AdMob.showConsentForm();
@@ -237,7 +237,7 @@ async function initNativeAds() {
     });
     // if an ad can't be filled, collapse its slot so there is no empty box in the list
     try { nativeFeed.addListener(AdMobJS.NativeAdPluginEvents.FailedToLoad, collapseAdSlot); } catch (e) {}
-    // native ads float above the page â€“ hide them whenever a sheet (detail/filters/alerts/admin) is open
+    // native ads float above the page \u2013 hide them whenever a sheet (detail/filters/alerts/admin) is open
     const sheets = document.querySelectorAll(".sheet");
     let paused = false;
     const sync = async () => { const open = [...sheets].some((x) => !x.classList.contains("hidden")); if (open && !paused) { paused = true; try { await nativeFeed.pause(); } catch (e) {} } else if (!open && paused) { paused = false; try { nativeFeed.resume(); } catch (e) {} } };
@@ -287,7 +287,7 @@ function initAppOpen() {
   });
 }
 // Interstitial: first scholarship opened / tab switch / 2nd+ "Load more" in this session, then at most one every M minutes (all triggers share the cap)
-// (never on app launch itself â€“ AdMob policy forbids interstitials on load)
+// (never on app launch itself \u2013 AdMob policy forbids interstitials on load)
 let lastInterstitialAt = 0;
 async function maybeInterstitial() {
   state.detailOpens++;
@@ -330,7 +330,7 @@ async function api(path, extraHeaders = {}) {
 let loadSeq = 0;
 async function load(reset = true) {
   const seq = ++loadSeq; // ignore responses from older requests (fixes unrelated results while typing)
-  if (reset) { state.offset = 0; state.items = []; $("#list").innerHTML = '<div class="loading">Loading opportunitiesâ€¦</div>'; }
+  if (reset) { state.offset = 0; state.items = []; $("#list").innerHTML = '<div class="loading">Loading opportunities\u2026</div>'; }
   if (reset && state.tab === "all") loadAnnouncement();
   if (state.tab === "saved") { state.items = Object.values(savedItems); state.total = state.items.length; render(); return; }
   if (state.tab === "plan") { renderPlan(); return; }
@@ -354,9 +354,9 @@ async function load(reset = true) {
 // Standalone sections: they read ONLY the `school_news` / `tech_news` tables. The scholarship feeds never
 // query these tables, so news can never appear under All / Closing soon / Official / regions / Saved.
 const NEWS_TABS = {
-  news: { table: "school_news", label: "School News Â· Nigeria", cols: "id,title,summary,url,source,tier,school_code,school,kind,published,image,logo" },
+  news: { table: "school_news", label: "School News \u00b7 Nigeria", cols: "id,title,summary,url,source,tier,school_code,school,kind,published,image,logo" },
   tech: { table: "tech_news", label: "Tech Updates", cols: "id,title,summary,url,source,tier,published,image,logo" },
-  jobs: { table: "jobs", label: "Jobs Â· Nigeria, remote & abroad", cols: "id,title,summary,url,source,tier,company,location,kind,deadline,published,image,logo", open: "Apply on site â†—" },
+  jobs: { table: "jobs", label: "Jobs \u00b7 Nigeria, remote & abroad", cols: "id,title,summary,url,source,tier,company,location,kind,deadline,published,image,logo", open: "Apply on site \u2197" },
 };
 const isNewsTab = () => !!NEWS_TABS[state.tab];
 const seenAt = {}; // when this tab was last opened (per session) -> items newer than that get a green dot
@@ -388,7 +388,7 @@ async function loadNews(seq) {
 }
 const KIND_PILL = { admission: ["Admission", "adm"], scholarship: ["Scholarship", "sch"], fees: ["Fees", "fee"], calendar: ["Calendar", "cal"], notice: ["Notice", "urg"], convocation: ["Convocation", "cal"],
   graduate: ["Graduate", "adm"], internship: ["Internship", "cal"], ngo: ["NGO", "sch"], research: ["Research", "sch"], remote: ["Remote", "fee"], abroad: ["Visa sponsored", "urg"], job: ["Job", "off"] };
-const whoLine = (i) => i.school ? esc(i.school) + " Â· " : i.company ? esc(i.company) + (i.location ? " Â· " + esc(i.location) : "") + " Â· " : i.location ? esc(i.location) + " Â· " : "";
+const whoLine = (i) => i.school ? esc(i.school) + " \u00b7 " : i.company ? esc(i.company) + (i.location ? " \u00b7 " + esc(i.location) : "") + " \u00b7 " : i.location ? esc(i.location) + " \u00b7 " : "";
 function ago(d) { const m = Math.max(0, Math.round((Date.now() - new Date(d)) / 60000)); if (m < 60) return m <= 1 ? "just now" : m + " min ago"; const h = Math.round(m / 60); if (h < 24) return h + " h ago"; const dd = Math.round(h / 24); if (dd < 7) return dd === 1 ? "yesterday" : dd + " days ago"; return new Date(d).toLocaleDateString([], { day: "numeric", month: "short" }); }
 function spreadEmployers(items) { // in-place: when two neighbours share an employer, pull the next different employer forward
   const key = (i) => (i.company || i.source || "").toLowerCase().trim();
@@ -398,23 +398,23 @@ function spreadEmployers(items) { // in-place: when two neighbours share an empl
     if (j > k) { const [x] = items.splice(j, 1); items.splice(k, 0, x); }
   }
 }
-const SEC_LABEL = { news: "ðŸ« School News", tech: "ðŸ’» Tech", jobs: "ðŸ’¼ Job" };
+const SEC_LABEL = { news: "\ud83c\udfeb School News", tech: "\ud83d\udcbb Tech", jobs: "\ud83d\udcbc Job" };
 const STAR_IMG = 'style="background:rgba(255,255,255,.88);border-radius:50%;width:34px;height:34px;line-height:26px;text-align:center;color:#475569;top:8px;right:8px"'; // over a picture: white circle like scholarship cards
 function newsCardHtml(i, sec, isNew) { // one card for School News / Tech Updates / Jobs (also used inside Saved)
   const t = NEWS_TABS[sec] || NEWS_TABS.news;
-  const img = hasMedia(i), pr = img ? 'style="right:50px"' : 'style="right:44px"'; // make room for the â˜… at the top-right
+  const img = hasMedia(i), pr = img ? 'style="right:50px"' : 'style="right:44px"'; // make room for the \u2605 at the top-right
   const pill = KIND_PILL[i.kind] ? `<span class="ntype ${KIND_PILL[i.kind][1]}" ${pr}>${KIND_PILL[i.kind][0]}</span>` : i.tier === "official" ? `<span class="ntype off" ${pr}>Official</span>` : "";
   const inSaved = state.tab === "saved";
-  const star = `<button class="star ${saved.has(i.id) ? "on" : ""}" data-star="${esc(i.id)}" ${img ? STAR_IMG : ""}>â˜…</button>`;
+  const star = `<button class="star ${saved.has(i.id) ? "on" : ""}" data-star="${esc(i.id)}" ${img ? STAR_IMG : ""}>\u2605</button>`;
   return `<div class="ncard${pill ? " has-pill" : ""}${img ? " has-img" : ""}" data-id="${esc(i.id)}">${mediaHtml(i)}${pill}${star}
-      <h3${img ? "" : pill ? ' style="padding-right:140px"' : ' style="padding-right:36px"'}>${isNew ? '<span class="ndot"></span>' : ""}${esc(i.title)}</h3>${sec === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">ðŸŸ¢ Open â€” apply now</div>') : ""}<p>${i.summary ? esc(i.summary) : "Tap to read the full update on " + esc(i.source) + "."}</p>
-      <div class="nmeta"><span class="src">${inSaved ? SEC_LABEL[sec] + " Â· " : ""}${whoLine(i)}via ${esc(i.source)} Â· ${ago(i.published)}</span><span class="go">${t.open || "Read on site â†—"}</span></div>
+      <h3${img ? "" : pill ? ' style="padding-right:140px"' : ' style="padding-right:36px"'}>${isNew ? '<span class="ndot"></span>' : ""}${esc(i.title)}</h3>${sec === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">\ud83d\udfe2 Open \u2014 apply now</div>') : ""}<p>${i.summary ? esc(i.summary) : "Tap to read the full update on " + esc(i.source) + "."}</p>
+      <div class="nmeta"><span class="src">${inSaved ? SEC_LABEL[sec] + " \u00b7 " : ""}${whoLine(i)}via ${esc(i.source)} \u00b7 ${ago(i.published)}</span><span class="go">${t.open || "Read on site \u2197"}</span></div>
     </div>`;
 }
 function renderNews() {
   const list = $("#list"), t = NEWS_TABS[state.tab];
-  $("#stats").textContent = `${state.total.toLocaleString()} updates Â· ${t.label}${state.tab === "jobs" && state.jobKind ? " Â· " + (KIND_PILL[state.jobKind] || [state.jobKind])[0] : ""}${state.q ? " Â· â€œ" + state.q + "â€" : ""}`;
-  if (!state.items.length) { list.innerHTML = `<div class="empty">${state.q ? "No updates match your search." : "No updates yet â€” pull down to refresh."}</div>`; $("#more").classList.add("hidden"); return; }
+  $("#stats").textContent = `${state.total.toLocaleString()} updates \u00b7 ${t.label}${state.tab === "jobs" && state.jobKind ? " \u00b7 " + (KIND_PILL[state.jobKind] || [state.jobKind])[0] : ""}${state.q ? " \u00b7 \u201c" + state.q + "\u201d" : ""}`;
+  if (!state.items.length) { list.innerHTML = `<div class="empty">${state.q ? "No updates match your search." : "No updates yet \u2014 pull down to refresh."}</div>`; $("#more").classList.add("hidden"); return; }
   const since = seenAt[state.tab] || 0;
   if (state.tab === "jobs") spreadEmployers(state.items); // never the same employer twice in a row
   list.innerHTML = state.items.map((i, idx) => `${idx > 0 && idx % 4 === 0 ? (isNative ? nativeSlot(i) : '<div class="ad-card">Advertisement</div>') : ""}${newsCardHtml(i, state.tab, new Date(i.published).getTime() > since)}`).join("");
@@ -427,22 +427,22 @@ function openNewsDetail(i) {
   const host = (() => { try { return new URL(i.url).hostname.replace(/^www\./, ""); } catch (e) { return ""; } })();
   $("#detailBody").innerHTML = `<div class="detail">${mediaHtml(i, true)}
     <h2>${esc(i.title)}</h2>
-    <div class="muted" style="margin:4px 0 10px">${whoLine(i)}via ${esc(i.source)} Â· ${ago(i.published)}${pill}</div>
-    ${sec === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">ðŸŸ¢ Open â€” apply now (no closing date stated)</div>') : ""}
+    <div class="muted" style="margin:4px 0 10px">${whoLine(i)}via ${esc(i.source)} \u00b7 ${ago(i.published)}${pill}</div>
+    ${sec === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">\ud83d\udfe2 Open \u2014 apply now (no closing date stated)</div>') : ""}
     <p>${esc(i.summary || (sec === "jobs" ? "Open the listing for the full description and how to apply." : "Open the full article to read more."))}</p>
-    <div class="muted" style="margin-top:6px;font-size:12px">${sec === "jobs" ? "â„¹ï¸ Independent app â€“ we list jobs from public job boards and never charge for applications. Beware of anyone asking for money to process a job. Apply only on the employer's or job board's page below." : `â„¹ï¸ Summary collected automatically from ${esc(host || i.source)}. Read the full article on the source website.`}</div>
+    <div class="muted" style="margin-top:6px;font-size:12px">${sec === "jobs" ? "\u2139\ufe0f Independent app \u2013 we list jobs from public job boards and never charge for applications. Beware of anyone asking for money to process a job. Apply only on the employer's or job board's page below." : `\u2139\ufe0f Summary collected automatically from ${esc(host || i.source)}. Read the full article on the source website.`}</div>
     ${detailSlot(i)}
     <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#0369a1">${esc(i.url)}</a></div>
     <div class="actions">
-      <button class="ghost" id="nSave">${saved.has(i.id) ? "â˜… Saved" : "â˜† Save"}</button>
+      <button class="ghost" id="nSave">${saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"}</button>
       <button class="ghost" id="nShare">Share</button>
-      <button id="nOpen">${NEWS_TABS[sec].open || "Read full article â†—"}</button>
+      <button id="nOpen">${NEWS_TABS[sec].open || "Read full article \u2197"}</button>
     </div>
     <div id="dNoteWrap"></div></div>`;
   $("#detail").classList.remove("hidden");
   $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
   $("#nOpen").onclick = () => openUrl(i.url);
-  $("#nSave").onclick = () => { i._sec = sec; toggleSave(i); $("#nSave").textContent = saved.has(i.id) ? "â˜… Saved" : "â˜† Save"; };
+  $("#nSave").onclick = () => { i._sec = sec; toggleSave(i); $("#nSave").textContent = saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"; };
   i._sec = sec; attachNoteBox(i, "#nSave");
   $("#nShare").onclick = () => shareItem(i);
 }
@@ -451,7 +451,7 @@ function setMode() {
   document.querySelectorAll(".hubbtn").forEach((b) => b.classList.toggle("on", (state.tab === "news" && b.id === "newsBtn") || (state.tab === "tech" && b.id === "techBtn") || (state.tab === "jobs" && b.id === "jobsBtn") || (!isNewsTab() && b.id === "schBtn")));
   if (state.tab === "jobs") document.querySelectorAll(".tabs [data-tab]").forEach((x) => x.classList.remove("on")); // Jobs has no bottom tab
   const jk = $("#jobKindBar"); if (jk) jk.classList.toggle("hidden", state.tab !== "jobs");
-  const q = $("#q"); if (q) q.placeholder = state.tab === "news" ? "Search school news, e.g. UNILAG admission listâ€¦" : state.tab === "tech" ? "Search tech updates, e.g. AI, Starlinkâ€¦" : state.tab === "jobs" ? "Search jobs, e.g. graduate trainee, Lagos, remoteâ€¦" : "Search scholarships, e.g. PhD Canadaâ€¦";
+  const q = $("#q"); if (q) q.placeholder = state.tab === "news" ? "Search school news, e.g. UNILAG admission list\u2026" : state.tab === "tech" ? "Search tech updates, e.g. AI, Starlink\u2026" : state.tab === "jobs" ? "Search jobs, e.g. graduate trainee, Lagos, remote\u2026" : "Search scholarships, e.g. PhD Canada\u2026";
 }
 
 // ---------- Play Store update prompt (Google's in-app update sheet; only works for installs that came from Play) ----------
@@ -466,7 +466,7 @@ async function checkPlayUpdate() {
     if (info.flexibleUpdateAllowed) {
       AppUpdate.addListener("onFlexibleUpdateStateChange", (st) => { if (st.installStatus === 11) {   // 11 = DOWNLOADED -> one tap to restart into the new version
         hideBoostToast(); const t = document.createElement("div"); t.className = "toast in"; t.id = "toast";
-        t.innerHTML = '<div class="toast-tag">â¬†ï¸ Update ready</div><div class="toast-q" style="font-style:normal">The new ScholarHub version has downloaded. Restart to use it.</div><button class="boost-next" style="position:static;margin-top:8px" id="updNow">Restart now</button><button class="toast-x" aria-label="Later">âœ•</button>';
+        t.innerHTML = '<div class="toast-tag">\u2b06\ufe0f Update ready</div><div class="toast-q" style="font-style:normal">The new ScholarHub version has downloaded. Restart to use it.</div><button class="boost-next" style="position:static;margin-top:8px" id="updNow">Restart now</button><button class="toast-x" aria-label="Later">\u2715</button>';
         document.body.appendChild(t); t.querySelector("#updNow").onclick = () => AppUpdate.completeFlexibleUpdate(); t.querySelector(".toast-x").onclick = hideBoostToast; } });
       await AppUpdate.startFlexibleUpdate();                            // Play shows its own "Update ScholarHub?" sheet; download continues in the background
     } else if (info.immediateUpdateAllowed) await AppUpdate.performImmediateUpdate();   // full-screen Play update flow
@@ -498,8 +498,8 @@ const ANN_COLORS = { red: ["#b91c1c", "#dc2626"], blue: ["#1d4ed8", "#2563eb"], 
 function annStyle(c) { c = String(c || "").trim().toLowerCase(); const p = ANN_COLORS[c] || (/^#[0-9a-f]{6}$/.test(c) ? [c, c] : ANN_COLORS.red); return `background:linear-gradient(135deg,${p[0]},${p[1]})`; }
 function showAnnouncement(list) {
   const box = $("#ann"); annN = list.length; annIdx = 0;
-  const slide = (a, k) => { const link = a.link_url && /^https?:\/\//i.test(a.link_url) ? `<div><button data-ann-link="${esc(a.link_url)}">${esc(a.link_text || "Open link â†’")}</button></div>` : "";
-    return `<div class="ann-slide" style="${annStyle(a.color)}"><div class="ann-tag"><span>ðŸ“£ Announcement</span>${annN > 1 ? `<small>${k + 1}/${annN}</small>` : ""}</div>${a.title ? `<b>${esc(a.title)}</b>` : ""}${a.body ? `<p>${esc(a.body)}</p>` : ""}${link}</div>`; };
+  const slide = (a, k) => { const link = a.link_url && /^https?:\/\//i.test(a.link_url) ? `<div><button data-ann-link="${esc(a.link_url)}">${esc(a.link_text || "Open link \u2192")}</button></div>` : "";
+    return `<div class="ann-slide" style="${annStyle(a.color)}"><div class="ann-tag"><span>\ud83d\udce3 Announcement</span>${annN > 1 ? `<small>${k + 1}/${annN}</small>` : ""}</div>${a.title ? `<b>${esc(a.title)}</b>` : ""}${a.body ? `<p>${esc(a.body)}</p>` : ""}${link}</div>`; };
   box.innerHTML = `<div class="ann-track">${list.map(slide).join("")}</div>${annN > 1 ? `<div class="ann-dots">${list.map((_, k) => `<i class="${k ? "" : "on"}"></i>`).join("")}</div><div class="ann-bar"></div>` : ""}`;
   box.classList.toggle("multi", annN > 1); box.classList.remove("hidden");
   annGo(0);
@@ -514,55 +514,55 @@ function showAnnouncement(list) {
 })();
 function setOffline(on) {
   let b = $(".offline");
-  if (on && !b) { b = document.createElement("div"); b.className = "offline"; b.textContent = "Offline â€“ showing saved results"; $("#top").after(b); }
+  if (on && !b) { b = document.createElement("div"); b.className = "offline"; b.textContent = "Offline \u2013 showing saved results"; $("#top").after(b); }
   if (!on && b) b.remove();
 }
 
 
-// ---------- Daily boost (motivation for applicants; rotates daily, tap â†» for another) ----------
+// ---------- Daily boost (motivation for applicants; rotates daily, tap \u21bb for another) ----------
 const BOOSTS = [
   ["Every application you send is a seed. Not all will grow, but none grow if you never plant.", "Keep showing up"],
   ["Rejection is redirection, not a verdict on your worth.", "Never lose hope"],
   ["The scholar who got the award applied. That is the only real difference.", "Apply anyway"],
-  ["You don't need to be the best candidate in the world â€” only the best version of yourself on paper today.", "Focus on your story"],
+  ["You don't need to be the best candidate in the world \u2014 only the best version of yourself on paper today.", "Focus on your story"],
   ["One 'no' costs you nothing. One 'yes' can change your family's story.", "Keep applying"],
   ["Deadlines don't wait for perfect. Submit good, then improve the next one.", "Done beats perfect"],
   ["Most scholarships are not won by geniuses. They are won by people who finished the form.", "Finish the form"],
-  ["Your background is not a weakness in your essay â€” it is the reason your story matters.", "Own your story"],
+  ["Your background is not a weakness in your essay \u2014 it is the reason your story matters.", "Own your story"],
   ["Ten applications with tailored essays beat fifty copy-pasted ones.", "Quality over quantity"],
-  ["Ask for recommendation letters early â€” give your referees at least 3 weeks and a summary of your achievements.", "Tip"],
+  ["Ask for recommendation letters early \u2014 give your referees at least 3 weeks and a summary of your achievements.", "Tip"],
   ["Read the eligibility twice. Half of all rejections happen before anyone reads the essay.", "Tip"],
   ["Answer the actual question in the essay prompt. Reviewers notice when you don't.", "Tip"],
-  ["Start your motivation letter with a specific moment, not with 'I am writing to applyâ€¦'", "Tip"],
-  ["Keep a folder with your CV, transcripts, passport scan and a 500-word bio. Each new application becomes 10Ã— faster.", "Tip"],
+  ["Start your motivation letter with a specific moment, not with 'I am writing to apply\u2026'", "Tip"],
+  ["Keep a folder with your CV, transcripts, passport scan and a 500-word bio. Each new application becomes 10\u00d7 faster.", "Tip"],
   ["The people who got funded last year felt exactly as unsure as you feel now.", "You belong here"],
   ["Slow progress is still progress. Open one application today, even if you only fill in your name.", "Small steps"],
-  ["Nobody is coming to apply for you. And that's good â€” it means it's in your hands.", "It's in your hands"],
+  ["Nobody is coming to apply for you. And that's good \u2014 it means it's in your hands.", "It's in your hands"],
   ["A funded degree is not a miracle; it is a numbers game played with patience.", "Be patient, be persistent"],
   ["When you get tired, rest. Don't quit.", "Rest, don't quit"],
   ["Your 'someday' starts with what you submit this week.", "Start now"],
   ["You are not behind. You are on your own timeline, and it is still running.", "Your timeline"],
   ["The essay you're afraid to write is usually the one that gets you in.", "Be brave on paper"],
   ["Waitlists turn into offers every year. Keep your email checked and your hope alive.", "Hope is a strategy"],
-  ["Show them impact: numbers, names, results. 'I led a team of 12 that raised â‚¦2m' beats 'I am a leader'.", "Tip"],
+  ["Show them impact: numbers, names, results. 'I led a team of 12 that raised \u20a62m' beats 'I am a leader'.", "Tip"],
   ["Proofread out loud. Your ear will catch what your eye skips.", "Tip"],
   ["Every expert applicant was once a confused beginner reading the requirements for the first time.", "You'll learn"],
   ["Don't compare your chapter 2 to someone else's chapter 10.", "Run your race"],
   ["A referee who knows you well beats a famous one who barely does.", "Tip"],
-  ["If you never hear back, you did not fail â€” you learned the process for free. Reuse everything.", "Nothing is wasted"],
+  ["If you never hear back, you did not fail \u2014 you learned the process for free. Reuse everything.", "Nothing is wasted"],
   ["Faith, focus and follow-through. Show up again tomorrow.", "See you tomorrow"],
 ];
 let boostIdx = Math.floor((Date.now() / 864e5)) % BOOSTS.length;
-function boostHtml() { const [q, tag] = BOOSTS[boostIdx]; return `<div class="boost" id="boost"><div class="boost-tag">âœ¨ ${esc(tag)}</div><div class="boost-q">${esc(q)}</div><button class="boost-next" data-boost="1" aria-label="Another one">â†»</button></div>`; }
+function boostHtml() { const [q, tag] = BOOSTS[boostIdx]; return `<div class="boost" id="boost"><div class="boost-tag">\u2728 ${esc(tag)}</div><div class="boost-q">${esc(q)}</div><button class="boost-next" data-boost="1" aria-label="Another one">\u21bb</button></div>`; }
 function nextBoost() { boostIdx = (boostIdx + 1) % BOOSTS.length; const b = $("#boost"); if (b) b.outerHTML = boostHtml(); }
-// Gentle pop-up: 3s after open, then every 5 min. Sits above tab bar + ad, auto-hides after 8s, tap âœ• or swipe to clear.
+// Gentle pop-up: 3s after open, then every 5 min. Sits above tab bar + ad, auto-hides after 8s, tap \u2715 or swipe to clear.
 let toastTimer;
 function showBoostToast() {
   if (document.querySelector(".sheet:not(.hidden)") || document.hidden) return; // never over a sheet or when app is in background
   hideBoostToast();
   const [q, tag] = BOOSTS[boostIdx]; boostIdx = (boostIdx + 1) % BOOSTS.length;
   const t = document.createElement("div"); t.className = "toast"; t.id = "toast";
-  t.innerHTML = `<div class="toast-tag">âœ¨ ${esc(tag)}</div><div class="toast-q">${esc(q)}</div><button class="toast-x" aria-label="Dismiss">âœ•</button>`;
+  t.innerHTML = `<div class="toast-tag">\u2728 ${esc(tag)}</div><div class="toast-q">${esc(q)}</div><button class="toast-x" aria-label="Dismiss">\u2715</button>`;
   document.body.appendChild(t); requestAnimationFrame(() => t.classList.add("in"));
   t.querySelector(".toast-x").onclick = hideBoostToast;
   let sx = 0; t.addEventListener("touchstart", (e) => (sx = e.touches[0].clientX), { passive: true });
@@ -572,7 +572,7 @@ function showBoostToast() {
 function showToast(tag, msg, ms = 7000) {
   hideBoostToast();
   const t = document.createElement("div"); t.className = "toast"; t.id = "toast";
-  t.innerHTML = `<div class="toast-tag">${esc(tag)}</div><div class="toast-q" style="font-style:normal">${esc(msg)}</div><button class="toast-x" aria-label="Dismiss">âœ•</button>`;
+  t.innerHTML = `<div class="toast-tag">${esc(tag)}</div><div class="toast-q" style="font-style:normal">${esc(msg)}</div><button class="toast-x" aria-label="Dismiss">\u2715</button>`;
   document.body.appendChild(t); requestAnimationFrame(() => t.classList.add("in"));
   t.querySelector(".toast-x").onclick = hideBoostToast; toastTimer = setTimeout(hideBoostToast, ms);
 }
@@ -581,19 +581,19 @@ function hideBoostToast() { clearTimeout(toastTimer); const t = $("#toast"); if 
 // ---------- render ----------
 const esc = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 function deadlineHtml(d) {
-  if (!d) return '<div class="dl ok">ðŸŸ¢ Open â€” apply now (no deadline stated)</div>';
+  if (!d) return '<div class="dl ok">\ud83d\udfe2 Open \u2014 apply now (no deadline stated)</div>';
   const days = Math.round((new Date(d) - new Date().setHours(0, 0, 0, 0)) / 864e5);
   const cls = days < 0 ? "past" : days <= 14 ? "soon" : "ok";
   const txt = days < 0 ? "expired" : days === 0 ? "today!" : days === 1 ? "1 day left" : days + " days left";
-  return `<div class="dl ${cls}">â° Deadline ${d} (${txt})</div>`;
+  return `<div class="dl ${cls}">\u23f0 Deadline ${d} (${txt})</div>`;
 }
 function tags(i) {
   let h = "";
-  if (i.tier === "official") h += '<span class="tag off">ðŸ› official</span>';
+  if (i.tier === "official") h += '<span class="tag off">\ud83c\udfdb official</span>';
   if (i.funding) h += `<span class="tag fund">${esc(i.funding)}</span>`;
   (i.levels || "").split(", ").filter(Boolean).forEach((l) => (h += `<span class="tag lvl">${esc(l)}</span>`));
-  (i.regions || "").split(", ").filter(Boolean).forEach((r) => (h += `<span class="tag">ðŸŒ ${esc(r)}</span>`));
-  (i.countries || "").split(", ").filter(Boolean).slice(0, 3).forEach((c) => (h += `<span class="tag">ðŸ“ ${esc(c)}</span>`));
+  (i.regions || "").split(", ").filter(Boolean).forEach((r) => (h += `<span class="tag">\ud83c\udf0d ${esc(r)}</span>`));
+  (i.countries || "").split(", ").filter(Boolean).slice(0, 3).forEach((c) => (h += `<span class="tag">\ud83d\udccd ${esc(c)}</span>`));
   return `<div class="tags">${h}</div>`;
 }
 // ---------- pictures: real picture -> real institution / publisher logo -> no image area at all (never a fake tile) ----------
@@ -606,37 +606,37 @@ const logoHtml = (u) => `<div class="nlogo"><img src="${esc(u)}" alt="" loading=
 const hasMedia = (i) => !!(i.image || i.logo);
 function render() {
   const list = $("#list");
-  if (!state.items.length) { list.innerHTML = `<div class="empty">${state.tab === "saved" ? "Nothing saved yet â€” tap â˜… on any scholarship, job or update to keep it here." : "No opportunities match. Try clearing filters."}</div>`; $("#more").classList.add("hidden"); return; }
+  if (!state.items.length) { list.innerHTML = `<div class="empty">${state.tab === "saved" ? "Nothing saved yet \u2014 tap \u2605 on any scholarship, job or update to keep it here." : "No opportunities match. Try clearing filters."}</div>`; $("#more").classList.add("hidden"); return; }
   list.innerHTML = state.items.map((i, idx) => `
     ${idx > 0 && idx % 4 === 0 ? (isNative ? nativeSlot(i) : '<div class="ad-card">Advertisement</div>') : ""}
     ${i._sec ? newsCardHtml(i, i._sec, false) : `<div class="card${hasMedia(i) ? " has-img" : ""}" data-id="${esc(i.id)}">
       ${mediaHtml(i)}
-      <button class="star ${saved.has(i.id) ? "on" : ""}" data-star="${esc(i.id)}">â˜…</button>
+      <button class="star ${saved.has(i.id) ? "on" : ""}" data-star="${esc(i.id)}">\u2605</button>
       <h3>${esc(i.title)}</h3>
       ${deadlineHtml(i.deadline)}
       <p>${esc(i.summary)}</p>
       ${tags(i)}
-      <div class="meta">via ${esc(i.source)} Â· ${esc((i.published || "").slice(0, 10))}</div>
+      <div class="meta">via ${esc(i.source)} \u00b7 ${esc((i.published || "").slice(0, 10))}</div>
     </div>`}`).join("");
   $("#more").classList.toggle("hidden", state.tab === "saved" || state.offset >= state.total);
-  $("#stats").textContent = `${state.total.toLocaleString()} ${state.newOnly ? "new " : ""}opportunities${state.region ? " Â· " + state.region : ""}${state.added ? ` Â· added in last ${state.added === 1 ? "24h" : state.added + " days"}` : ""}${state.dlFrom || state.dlTo ? ` Â· deadline ${state.dlFrom || "â€¦"} â†’ ${state.dlTo || "â€¦"}` : ""}${state.newOnly ? " Â· tap â†» for all" : ""}`;
-  api("/app_stats?select=last_run").then((r) => { const t = r.items[0] && r.items[0].last_run; if (t) $("#stats").textContent += ` Â· updated ${new Date(t).toLocaleString([], { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`; }).catch(() => {});
+  $("#stats").textContent = `${state.total.toLocaleString()} ${state.newOnly ? "new " : ""}opportunities${state.region ? " \u00b7 " + state.region : ""}${state.added ? ` \u00b7 added in last ${state.added === 1 ? "24h" : state.added + " days"}` : ""}${state.dlFrom || state.dlTo ? ` \u00b7 deadline ${state.dlFrom || "\u2026"} \u2192 ${state.dlTo || "\u2026"}` : ""}${state.newOnly ? " \u00b7 tap \u21bb for all" : ""}`;
+  api("/app_stats?select=last_run").then((r) => { const t = r.items[0] && r.items[0].last_run; if (t) $("#stats").textContent += ` \u00b7 updated ${new Date(t).toLocaleString([], { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}`; }).catch(() => {});
 }
 let planView = localStorage.getItem("planView") || "todo", editingNote = null;
 function renderPlan() {
   const list = $("#list"); $("#more").classList.add("hidden");
   const open = plan.filter((t) => !t.done), done = plan.filter((t) => t.done);
   const noteIds = Object.keys(notes).filter((k) => notes[k]);
-  $("#stats").textContent = planView === "notes" ? `${noteIds.length} note${noteIds.length === 1 ? "" : "s"}` : `${open.length} to do Â· ${done.length} done`;
+  $("#stats").textContent = planView === "notes" ? `${noteIds.length} note${noteIds.length === 1 ? "" : "s"}` : `${open.length} to do \u00b7 ${done.length} done`;
   const seg = `<div class="row" style="gap:8px;margin:4px 0 10px">
-      <button class="${planView === "todo" ? "" : "ghost"}" data-pview="todo" style="flex:1">ðŸ“‹ Daily plan (To do)</button>
-      <button class="${planView === "notes" ? "" : "ghost"}" data-pview="notes" style="flex:1">ðŸ“ Opportunity notes</button></div>`;
-  const dueTxt = (d) => { if (!d) return ""; const days = Math.round((new Date(d) - new Date().setHours(0, 0, 0, 0)) / 864e5); return `<span class="${days < 0 ? "dl past" : days <= 3 ? "dl soon" : ""}">ðŸ“… ${d}${days < 0 ? " (overdue)" : days === 0 ? " (today)" : days > 0 && days <= 14 ? ` (${days}d)` : ""}</span>`; };
+      <button class="${planView === "todo" ? "" : "ghost"}" data-pview="todo" style="flex:1">\ud83d\udccb Daily plan (To do)</button>
+      <button class="${planView === "notes" ? "" : "ghost"}" data-pview="notes" style="flex:1">\ud83d\udcdd Opportunity notes</button></div>`;
+  const dueTxt = (d) => { if (!d) return ""; const days = Math.round((new Date(d) - new Date().setHours(0, 0, 0, 0)) / 864e5); return `<span class="${days < 0 ? "dl past" : days <= 3 ? "dl soon" : ""}">\ud83d\udcc5 ${d}${days < 0 ? " (overdue)" : days === 0 ? " (today)" : days > 0 && days <= 14 ? ` (${days}d)` : ""}</span>`; };
   const row = (t) => `<div class="task ${t.done ? "done" : ""}" data-task="${t.id}">
       <input type="checkbox" data-done="${t.id}" ${t.done ? "checked" : ""}>
       <div class="body"><div class="txt" data-edit="${t.id}" title="Tap to edit">${esc(t.text)}</div>
-        <div class="sub">${dueTxt(t.due)}${t.sid ? `${t.due ? " Â· " : ""}${savedItems[t.sid] && savedItems[t.sid]._sec ? (SEC_LABEL[savedItems[t.sid]._sec] || "").slice(0, 2) : "ðŸŽ“"} <a href="#" data-goto="${esc(t.sid)}">${esc(t.stitle).slice(0, 60)}</a>` : ""}</div></div>
-      <button class="del" data-edit="${t.id}" aria-label="Edit">âœŽ</button><button class="del" data-del="${t.id}" aria-label="Delete">âœ•</button></div>`;
+        <div class="sub">${dueTxt(t.due)}${t.sid ? `${t.due ? " \u00b7 " : ""}${savedItems[t.sid] && savedItems[t.sid]._sec ? (SEC_LABEL[savedItems[t.sid]._sec] || "").slice(0, 2) : "\ud83c\udf93"} <a href="#" data-goto="${esc(t.sid)}">${esc(t.stitle).slice(0, 60)}</a>` : ""}</div></div>
+      <button class="del" data-edit="${t.id}" aria-label="Edit">\u270e</button><button class="del" data-del="${t.id}" aria-label="Delete">\u2715</button></div>`;
   const noteRow = (sid) => { const it = savedItems[sid] || {}; const title = it.title || "Scholarship"; const editing = editingNote === sid; const dl = it._sec && !it.deadline ? "" : deadlineHtml(it.deadline); return `<div class="card" data-notecard="${esc(sid)}" style="margin-bottom:10px">
       <h3 style="padding-right:0"><a href="#" data-goto="${esc(sid)}">${esc(title)}</a></h3>
       ${it._sec ? `<div class="muted" style="font-size:12px;margin:-2px 0 6px">${SEC_LABEL[it._sec] || ""}</div>` : ""}${dl}
@@ -645,16 +645,16 @@ function renderPlan() {
            <div class="row" style="justify-content:flex-end;gap:8px;margin-top:8px"><button class="ghost" data-ncancel="${esc(sid)}">Cancel</button><button data-nsave="${esc(sid)}">Save</button></div>`
         : `<div style="margin-top:10px;padding:10px 12px;border-left:3px solid var(--acc);background:#f1f5f9;border-radius:8px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(notes[sid])}</div>
            <div class="row" style="justify-content:flex-end;gap:14px;margin-top:10px;font-size:13px">
-             <a href="#" data-nedit="${esc(sid)}" style="color:#0369a1;text-decoration:none">âœŽ Edit</a>
-             <a href="#" data-goto="${esc(sid)}" style="color:#0369a1;text-decoration:none">Open â†—</a>
-             <a href="#" data-ndel="${esc(sid)}" style="color:var(--bad);text-decoration:none">âœ• Delete</a></div>`}
+             <a href="#" data-nedit="${esc(sid)}" style="color:#0369a1;text-decoration:none">\u270e Edit</a>
+             <a href="#" data-goto="${esc(sid)}" style="color:#0369a1;text-decoration:none">Open \u2197</a>
+             <a href="#" data-ndel="${esc(sid)}" style="color:var(--bad);text-decoration:none">\u2715 Delete</a></div>`}
     </div>`; };
   if (planView === "notes") {
-    list.innerHTML = boostHtml() + seg + (noteIds.length ? noteIds.map(noteRow).join("") : '<div class="empty">No notes yet. Open any scholarship, job or update and tap "Add to opportunity note" â€“ it will appear here.</div>');
+    list.innerHTML = boostHtml() + seg + (noteIds.length ? noteIds.map(noteRow).join("") : '<div class="empty">No notes yet. Open any scholarship, job or update and tap "Add to opportunity note" \u2013 it will appear here.</div>');
   } else {
     list.innerHTML = boostHtml() + seg + `<div class="plan-add">
-      <textarea id="tText" placeholder="What are you working on? e.g. Request transcript for DAAD application, write motivation letterâ€¦"></textarea>
-      <div class="row"><input type="date" id="tDue" aria-label="Due date"><button id="tAdd">ï¼‹ Add</button></div></div>
+      <textarea id="tText" placeholder="What are you working on? e.g. Request transcript for DAAD application, write motivation letter\u2026"></textarea>
+      <div class="row"><input type="date" id="tDue" aria-label="Due date"><button id="tAdd">\uff0b Add</button></div></div>
     ${plan.length ? "" : '<div class="empty">Your plan is empty. Add tasks here, or open any scholarship and tap "Add to plan".</div>'}
     ${open.length ? '<div class="plan-h">To do</div>' + open.map(row).join("") : ""}
     ${done.length ? '<div class="plan-h">Done</div>' + done.map(row).join("") : ""}`;
@@ -662,7 +662,7 @@ function renderPlan() {
     $("#tText").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#tAdd").click(); } };
   }
   list.querySelectorAll("[data-pview]").forEach((b) => (b.onclick = () => { planView = b.dataset.pview; localStorage.setItem("planView", planView); renderPlan(); }));
-  // notes: view â†’ edit (Save/Cancel), delete, or jump to the scholarship
+  // notes: view \u2192 edit (Save/Cancel), delete, or jump to the scholarship
   list.querySelectorAll("[data-nedit]").forEach((el) => (el.onclick = (e) => { e.preventDefault(); editingNote = el.dataset.nedit; renderPlan(); const ta = list.querySelector("textarea[data-note]"); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }));
   list.querySelectorAll("[data-ncancel]").forEach((el) => (el.onclick = () => { editingNote = null; renderPlan(); }));
   list.querySelectorAll("[data-nsave]").forEach((el) => (el.onclick = () => { const ta = list.querySelector(`textarea[data-note="${el.dataset.nsave}"]`); const v = ta ? ta.value.trim() : ""; if (v) notes[el.dataset.nsave] = v; else delete notes[el.dataset.nsave]; savePlan(); editingNote = null; renderPlan(); }));
@@ -674,46 +674,46 @@ function openDetail(i) {
     <h2>${esc(i.title)}</h2>${deadlineHtml(i.deadline)}${tags(i)}
     <p>${esc(i.summary)}</p>
     <div class="muted">Source: ${esc(i.source)}${i.tier === "official" ? " (provider's own website)" : ""}</div>
-    <div class="muted" style="margin-top:6px;font-size:12px">â„¹ï¸ Independent app â€“ not affiliated with any government, university or provider. Verify all details and apply only on the official page below.</div>
+    <div class="muted" style="margin-top:6px;font-size:12px">\u2139\ufe0f Independent app \u2013 not affiliated with any government, university or provider. Verify all details and apply only on the official page below.</div>
     ${detailSlot(i)}
     <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#0369a1">${esc(i.url)}</a></div>
     <div class="actions">
-      <button class="ghost" id="dSave">${saved.has(i.id) ? "â˜… Saved" : "â˜† Save"}</button>
+      <button class="ghost" id="dSave">${saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"}</button>
       <button class="ghost" id="dShare">Share</button>
-      <button id="dOpen">Apply / Details â†—</button>
+      <button id="dOpen">Apply / Details \u2197</button>
     </div>
     <div id="dNoteWrap"></div></div>`;
   $("#detail").classList.remove("hidden");
   $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
   $("#dOpen").onclick = () => openUrl(i.url);
   $("#dShare").onclick = () => shareItem(i);
-  $("#dSave").onclick = () => { toggleSave(i); $("#dSave").textContent = saved.has(i.id) ? "â˜… Saved" : "â˜† Save"; };
+  $("#dSave").onclick = () => { toggleSave(i); $("#dSave").textContent = saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"; };
   attachNoteBox(i, "#dSave");
 }
 function attachNoteBox(i, saveSel) { // "Add to plan" + personal note, shared by scholarship and job/news sheets
   const renderNoteBox = (editing) => {
     const cur = notes[i.id] || "";
     $("#dNoteWrap").innerHTML = editing
-      ? `<div class="muted" style="margin-top:16px">ðŸ“ Opportunity note</div>
-         <textarea class="note" id="dNote" placeholder="e.g. Need 2 reference letters, IELTS 6.5, submit before 15 Marchâ€¦">${esc(cur)}</textarea>
+      ? `<div class="muted" style="margin-top:16px">\ud83d\udcdd Opportunity note</div>
+         <textarea class="note" id="dNote" placeholder="e.g. Need 2 reference letters, IELTS 6.5, submit before 15 March\u2026">${esc(cur)}</textarea>
          <div class="row" style="justify-content:flex-end;gap:8px;margin-top:8px"><button class="ghost" id="dNoteCancel">Cancel</button><button id="dNoteSave">Save note</button></div>`
-      : `${cur ? `<div class="muted" style="margin-top:16px">ðŸ“ Opportunity note</div><div style="margin-top:6px;padding:10px 12px;border-left:3px solid var(--acc);background:#f1f5f9;border-radius:8px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(cur)}</div>` : ""}
-         <div class="row" style="gap:8px;margin-top:14px"><button class="ghost" id="dPlan" style="flex:1">ï¼‹ Add to plan</button><button class="ghost" id="dNoteBtn" style="flex:1">${cur ? "âœŽ Edit opportunity note" : "ðŸ“ Add to opportunity note"}</button></div>
+      : `${cur ? `<div class="muted" style="margin-top:16px">\ud83d\udcdd Opportunity note</div><div style="margin-top:6px;padding:10px 12px;border-left:3px solid var(--acc);background:#f1f5f9;border-radius:8px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(cur)}</div>` : ""}
+         <div class="row" style="gap:8px;margin-top:14px"><button class="ghost" id="dPlan" style="flex:1">\uff0b Add to plan</button><button class="ghost" id="dNoteBtn" style="flex:1">${cur ? "\u270e Edit opportunity note" : "\ud83d\udcdd Add to opportunity note"}</button></div>
          <div class="muted" id="dNoteSaved" style="margin-top:6px;font-size:12px">${planCount(i.id)}</div>`;
     if (editing) {
       $("#dNote").focus();
       $("#dNoteCancel").onclick = () => renderNoteBox(false);
-      $("#dNoteSave").onclick = () => { const v = $("#dNote").value.trim(); if (v) { notes[i.id] = v; if (!savedItems[i.id]) { if (!i._sec && NEWS_TABS[state.tab]) i._sec = state.tab; savedItems[i.id] = i; saved.add(i.id); localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems)); $(saveSel).textContent = "â˜… Saved"; } } else delete notes[i.id]; savePlan(); renderNoteBox(false); $("#dNoteSaved").textContent = v ? "Note saved âœ“ â€” see Plan â†’ Opportunity notes" : planCount(i.id); };
+      $("#dNoteSave").onclick = () => { const v = $("#dNote").value.trim(); if (v) { notes[i.id] = v; if (!savedItems[i.id]) { if (!i._sec && NEWS_TABS[state.tab]) i._sec = state.tab; savedItems[i.id] = i; saved.add(i.id); localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems)); $(saveSel).textContent = "\u2605 Saved"; } } else delete notes[i.id]; savePlan(); renderNoteBox(false); $("#dNoteSaved").textContent = v ? "Note saved \u2713 \u2014 see Plan \u2192 Opportunity notes" : planCount(i.id); };
     } else {
       $("#dNoteBtn").onclick = () => renderNoteBox(true);
-      $("#dPlan").onclick = () => { const text = prompt("Task for â€œ" + i.title.slice(0, 40) + "â€¦â€", "Apply: " + i.title.slice(0, 60)); if (text === null) return; addTask(text, i.deadline || "", i); $("#dNoteSaved").textContent = planCount(i.id) + " Â· added to Daily plan âœ“"; };
+      $("#dPlan").onclick = () => { const text = prompt("Task for \u201c" + i.title.slice(0, 40) + "\u2026\u201d", "Apply: " + i.title.slice(0, 60)); if (text === null) return; addTask(text, i.deadline || "", i); $("#dNoteSaved").textContent = planCount(i.id) + " \u00b7 added to Daily plan \u2713"; };
     }
   };
   renderNoteBox(false);
 }
 function planCount(sid) { const n = plan.filter((t) => t.sid === sid && !t.done).length; return n ? `${n} open task${n > 1 ? "s" : ""} in plan` : ""; }
 function toggleSave(i) {
-  if (!i._sec && NEWS_TABS[state.tab]) i._sec = state.tab; // news / tech / jobs item â†’ remember its section for the Saved tab
+  if (!i._sec && NEWS_TABS[state.tab]) i._sec = state.tab; // news / tech / jobs item \u2192 remember its section for the Saved tab
   if (saved.has(i.id)) { saved.delete(i.id); delete savedItems[i.id]; } else { saved.add(i.id); savedItems[i.id] = i; }
   localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems));
   document.querySelectorAll(`[data-star="${i.id}"]`).forEach((b) => b.classList.toggle("on", saved.has(i.id)));
@@ -783,16 +783,16 @@ $("#aSave").onclick = async () => {
   notif.daily = $("#nDaily").checked; notif.region = $("#nRegion").value; notif.deadlines = $("#nDeadlines").checked; saveNotif();
   if ((notif.daily || notif.deadlines) && isNative) {
     const ok = await askPermission();
-    if (!ok) { alert("Notifications are blocked for ScholarHub. Allow them in your phone's Settings â†’ Apps â†’ ScholarHub â†’ Notifications."); }
+    if (!ok) { alert("Notifications are blocked for ScholarHub. Allow them in your phone's Settings \u2192 Apps \u2192 ScholarHub \u2192 Notifications."); }
   }
   await applyDailyPush(); await rescheduleAllDeadlines();
   $("#alerts").classList.add("hidden");
   const on = [notif.daily && "daily picks" + (notif.region ? " for " + notif.region : ""), notif.deadlines && "deadline reminders"].filter(Boolean);
-  if (on.length) alert("âœ… You'll get " + on.join(" and ") + ".");
+  if (on.length) alert("\u2705 You'll get " + on.join(" and ") + ".");
 };
 document.querySelectorAll(".sheet").forEach((s) => s.addEventListener("click", (e) => { if (e.target === s) s.classList.add("hidden"); }));
 
-// ---------- admin (tap logo 7Ã—, then PIN) ----------
+// ---------- admin (tap logo 7\u00d7, then PIN) ----------
 let logoTaps = 0, logoTimer, adminPin = ""; // PIN is verified by the database policy, never stored in the app
 document.querySelector(".brand").addEventListener("click", () => {
   logoTaps++; clearTimeout(logoTimer); logoTimer = setTimeout(() => (logoTaps = 0), 2500);
@@ -804,9 +804,9 @@ async function openAdmin() {
 async function refreshAdmin() {
   try {
     const pulls = (await api("/pull_requests?select=url,status,found,new_items,error,created&order=created.desc&limit=8")).items;
-    $("#pList").innerHTML = pulls.length ? pulls.map((p) => `<div style="margin:4px 0">${p.status === "done" ? "âœ…" : p.status === "error" ? "âŒ" : "â³"} ${esc(p.url).slice(0, 60)} <small>${p.status}${p.found != null ? ` Â· found ${p.found}, new ${p.new_items}` : ""}${p.error ? " Â· " + esc(p.error).slice(0, 80) : ""}</small></div>`).join("") : "No pulls yet";
+    $("#pList").innerHTML = pulls.length ? pulls.map((p) => `<div style="margin:4px 0">${p.status === "done" ? "\u2705" : p.status === "error" ? "\u274c" : "\u23f3"} ${esc(p.url).slice(0, 60)} <small>${p.status}${p.found != null ? ` \u00b7 found ${p.found}, new ${p.new_items}` : ""}${p.error ? " \u00b7 " + esc(p.error).slice(0, 80) : ""}</small></div>`).join("") : "No pulls yet";
     const runs = (await api("/runs?select=started,finished,new_items,total_items&order=started.desc&limit=5")).items;
-    $("#pRuns").innerHTML = runs.map((r) => `<div>${new Date(r.started).toLocaleString()} Â· +${r.new_items} new Â· ${r.total_items} total</div>`).join("") || "No crawls yet";
+    $("#pRuns").innerHTML = runs.map((r) => `<div>${new Date(r.started).toLocaleString()} \u00b7 +${r.new_items} new \u00b7 ${r.total_items} total</div>`).join("") || "No crawls yet";
   } catch (e) { $("#pList").textContent = "Could not load (run supabase/schema.sql again to add the pull_requests table)"; }
 }
 $("#pCancel").onclick = () => $("#admin").classList.add("hidden");
@@ -817,14 +817,14 @@ $("#pQueue").onclick = async () => {
     const r = await fetch(SB_URL + "/pull_requests", { method: "POST", headers: { ...SB_HEADERS, "Content-Type": "application/json" }, body: JSON.stringify({ url, save_as_source: $("#pSave").checked, deep: $("#pDeep").checked, ...(window.ADMIN_PIN ? {} : { pin: adminPin }) }) });
     if (r.status === 401 || r.status === 403) { alert("Wrong admin PIN."); $("#admin").classList.add("hidden"); return; }
     if (!r.ok) throw new Error(r.status);
-    $("#pUrl").value = ""; alert("Queued. It will be pulled on the next crawl â€” or run â€œPull from a linkâ€ on GitHub now."); refreshAdmin();
+    $("#pUrl").value = ""; alert("Queued. It will be pulled on the next crawl \u2014 or run \u201cPull from a link\u201d on GitHub now."); refreshAdmin();
   } catch (e) { alert("Could not queue: " + e.message); }
 };
 
 // ---------- init ----------
 async function init() {
   const boot = $("#boot");
-  if (boot && (!isNative || !AdMob || !(window.ADMOB && window.ADMOB.appOpenId))) boot.remove(); // no app-open ad possible â†’ no loading screen
+  if (boot && (!isNative || !AdMob || !(window.ADMOB && window.ADMOB.appOpenId))) boot.remove(); // no app-open ad possible \u2192 no loading screen
   setTimeout(() => { const b = $("#boot"); if (b) b.remove(); }, 7000); // hard fallback: never leave the loading screen stuck
   initAds();
   try {
@@ -832,7 +832,7 @@ async function init() {
     const fill = (id, arr) => (document.getElementById(id).innerHTML += arr.map((v) => `<option>${esc(v)}</option>`).join(""));
     fill("fLevel", f.levels); fill("fFunding", f.funding);
     $("#nRegion").innerHTML += f.regions.map((r) => `<option>${esc(r)}</option>`).join("");
-    $("#regionChips").innerHTML = ['<button class="chip on" data-region="">ðŸŒ All</button>'].concat(f.regions.map((r) => `<button class="chip" data-region="${esc(r)}">${esc(r)}</button>`)).join("");
+    $("#regionChips").innerHTML = ['<button class="chip on" data-region="">\ud83c\udf0d All</button>'].concat(f.regions.map((r) => `<button class="chip" data-region="${esc(r)}">${esc(r)}</button>`)).join("");
     document.querySelectorAll(".chip").forEach((c) => (c.onclick = () => { document.querySelectorAll(".chip").forEach((x) => x.classList.remove("on")); c.classList.add("on"); state.region = c.dataset.region; load(); }));
   } catch (e) {}
   load();
@@ -865,7 +865,7 @@ async function init() {
   }
   if (FCM && FCM.addListener) {
     FCM.addListener("notificationActionPerformed", (ev) => openFromNotif(ev.notification && ev.notification.data));
-    FCM.addListener("notificationReceived", (ev) => { const n = ev.notification || {}; if (n.title) { hideBoostToast(); const t = document.createElement("div"); t.className = "toast in"; t.id = "toast"; t.innerHTML = `<div class="toast-tag">ðŸ”” ${esc(n.title)}</div><div class="toast-q">${esc(n.body || "")}</div><button class="toast-x">âœ•</button>`; document.body.appendChild(t); t.querySelector(".toast-x").onclick = hideBoostToast; t.onclick = () => { hideBoostToast(); openFromNotif(n.data); }; toastTimer = setTimeout(hideBoostToast, 10000); } });
+    FCM.addListener("notificationReceived", (ev) => { const n = ev.notification || {}; if (n.title) { hideBoostToast(); const t = document.createElement("div"); t.className = "toast in"; t.id = "toast"; t.innerHTML = `<div class="toast-tag">\ud83d\udd14 ${esc(n.title)}</div><div class="toast-q">${esc(n.body || "")}</div><button class="toast-x">\u2715</button>`; document.body.appendChild(t); t.querySelector(".toast-x").onclick = hideBoostToast; t.onclick = () => { hideBoostToast(); openFromNotif(n.data); }; toastTimer = setTimeout(hideBoostToast, 10000); } });
     applyDailyPush();
   }
   if (LocalNotif && LocalNotif.addListener) LocalNotif.addListener("localNotificationActionPerformed", (ev) => openFromNotif(ev.notification && ev.notification.extra));
@@ -875,7 +875,7 @@ async function init() {
   // motivation pop-ups: shortly after open, then every 5 minutes of use
   setTimeout(showBoostToast, 3000);
   setInterval(showBoostToast, 5 * 60 * 1000);
-  // refresh when a new crawl has landed (twice a day) â€“ check every 10 min while the app is open
+  // refresh when a new crawl has landed (twice a day) \u2013 check every 10 min while the app is open
   let lastRun = null;
   setInterval(async () => { try { const s = (await api("/app_stats?select=last_run")).items[0]; if (lastRun && s.last_run !== lastRun && state.tab === "all" && !state.q) load(); lastRun = s.last_run; } catch (e) {} }, 600000);
 }
