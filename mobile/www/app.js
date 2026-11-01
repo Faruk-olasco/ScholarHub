@@ -94,28 +94,12 @@ function shareText(i) {
 let shareBusy = false;
 async function shareItem(i) {
   if (shareBusy) return; shareBusy = true;
+  // Text + smart link only (no attached picture): WhatsApp, Telegram, X and Facebook then draw the big
+  // tweet-style preview card themselves from the link (title, description and picture come from the site).
   const text = shareText(i), title = i.title, dialogTitle = "Share";
   try {
-    let imgErr = "";
-    // 1) native: draw the card, save it to the app cache and hand image + text to the share sheet (WhatsApp chats AND Status accept this)
-    if (Share && Share.share && FS && FS.writeFile) {
-      try {
-        const data = (await cardImage(i)).split(",")[1];
-        const f = await FS.writeFile({ path: "share-" + Date.now() + ".png", data, directory: "CACHE" });
-        await Share.share({ title, text, files: [f.uri], dialogTitle }); return;
-      } catch (e) { imgErr = (e && (e.message || e.code || String(e))) || "unknown"; if (/cancel/i.test(imgErr)) return; console.warn("image share failed", e); }
-    }
-    // 2) web: share the image file if the browser supports it
-    try {
-      if (navigator.share && navigator.canShare) {
-        const blob = await (await fetch(await cardImage(i))).blob(); const file = new File([blob], "scholarhub.png", { type: "image/png" });
-        if (navigator.canShare({ files: [file] })) { await navigator.share({ title, text, files: [file] }); return; }
-      }
-    } catch (e) { if (/abort/i.test(String(e))) return; }
-    // 3) fallbacks: text only \u2013 and say why, so the problem can be reported
-    if (imgErr) showToast("\u2139\ufe0f Shared as text", "Card picture could not be attached: " + imgErr.slice(0, 120));
-    try { if (Share && Share.share) return await Share.share({ title, text, dialogTitle }); } catch (e) {}
-    try { if (navigator.share) return await navigator.share({ title, text }); } catch (e) {}
+    try { if (Share && Share.share) return await Share.share({ title, text, dialogTitle }); } catch (e) { if (/cancel/i.test(String(e && (e.message || e.code || e)))) return; }
+    try { if (navigator.share) return await navigator.share({ title, text }); } catch (e) { if (/abort/i.test(String(e))) return; }
     try { await navigator.clipboard.writeText(text); alert("Copied"); } catch (e) { prompt("Copy", text); }
   } finally { shareBusy = false; }
 }
