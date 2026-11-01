@@ -145,7 +145,7 @@ async function applyDailyPush() {
   if (!isNative || !FCM) return;
   try {
     try { await FCM.createChannel({ id: "scholarhub_daily", name: "Daily picks", description: "Six short updates a day: scholarships, school news, jobs, tech and closing-soon deadlines", importance: 4 }); } catch (e) {}
-    const want = notif.daily ? topicOf(notif.region) + "_v2" : null;   // "_v2" = this app draws the push card itself (picture in the banner); plain topics are for older versions
+    const want = notif.daily ? topicOf(notif.region) : null;   // plain topic = standard Firebase notification card (the "_v2" topics are only unsubscribed here)
     const base = ["all"].concat(FILTERS.regions.map(topicOf)), topics = base.concat(base.map((t) => t + "_v2"));
     for (const t of topics) { if (t !== want) { try { await FCM.unsubscribeFromTopic({ topic: t }); } catch (e) {} } }
     if (want) await FCM.subscribeToTopic({ topic: want });
