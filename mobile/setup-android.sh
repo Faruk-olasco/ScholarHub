@@ -35,6 +35,23 @@ s=re.sub(r"(<activity[^>]*MainActivity[\s\S]*?)</activity>", lambda m:m.group(1)
 open(p,"w").write(s); print("deep-link intent filters added for", host)
 PY
 fi
+# Verified app link: https://scholarhub.smartaiintel.com/?s=<id> opens straight in the app (paired with docs/.well-known/assetlinks.json)
+if ! grep -q 'android:host="scholarhub.smartaiintel.com"' "$MANIFEST"; then
+  python3 - "$MANIFEST" <<'PY2'
+import re,sys
+p=sys.argv[1]; s=open(p).read()
+f="""
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="scholarhub.smartaiintel.com"/>
+            </intent-filter>
+        </activity>"""
+s=re.sub(r"(<activity[^>]*MainActivity[\s\S]*?)</activity>", lambda m:m.group(1)+f, s, count=1)
+open(p,"w").write(s); print("verified app link added for scholarhub.smartaiintel.com")
+PY2
+fi
 # Android 13+ notification permission (push + deadline reminders)
 grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST" || sed -i 's#<application #<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application #' "$MANIFEST"
 [ -f android/app/google-services.json ] && echo "Firebase: google-services.json present" || echo "Firebase: no google-services.json (push disabled in this build)"
