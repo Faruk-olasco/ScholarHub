@@ -7,12 +7,12 @@
 <meta name="description" content="ScholarHub is a free Android app that finds fully funded scholarships, fellowships and grants worldwide, Nigerian school news (JAMB, WAEC, universities), tech updates and entry-level jobs, internships and NYSC roles – updated twice daily with deadline reminders.">
 <meta name="keywords" content="scholarship app, scholarships for Nigerian students, fully funded scholarships 2026, fully funded scholarships 2027, study abroad scholarships, undergraduate scholarships, masters scholarships, PhD scholarships, JAMB news, WAEC news, school news Nigeria, graduate trainee jobs, internship Nigeria, NYSC jobs, entry level jobs Nigeria, tech news Nigeria">
 <meta name="robots" content="index,follow">
-<link rel="canonical" href="https://faruk-olasco.github.io/ScholarHub/">
+<link rel="canonical" href="https://scholarhub.smartaiintel.com/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="ScholarHub">
 <meta property="og:title" content="ScholarHub – Scholarships, School News, Tech Updates & Jobs">
 <meta property="og:description" content="Free Android app: fully funded scholarships worldwide, Nigerian school news, tech updates and graduate jobs – updated twice a day with deadline reminders.">
-<meta property="og:url" content="https://faruk-olasco.github.io/ScholarHub/">
+<meta property="og:url" content="https://scholarhub.smartaiintel.com/">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="ScholarHub – Scholarships, School News, Tech Updates & Jobs">
 <meta name="twitter:description" content="Free Android app: fully funded scholarships worldwide, Nigerian school news, tech updates and graduate jobs – updated twice a day.">
@@ -20,7 +20,7 @@
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"MobileApplication","name":"ScholarHub","operatingSystem":"Android","applicationCategory":"EducationApplication",
 "description":"Free Android app that finds fully funded scholarships, fellowships and grants worldwide, Nigerian school news, tech updates and entry-level jobs, internships and NYSC roles. Updated twice daily with deadline reminders.",
-"url":"https://faruk-olasco.github.io/ScholarHub/","installUrl":"https://play.google.com/store/apps/details?id=com.scholarhub.app",
+"url":"https://scholarhub.smartaiintel.com/","installUrl":"https://play.google.com/store/apps/details?id=com.scholarhub.app",
 "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Faruk Olasco"},"inLanguage":"en"}
 </script>
 <style>
@@ -107,8 +107,9 @@ footer{margin-top:40px;text-align:center;font-size:13px;color:#64748b}footer a{c
 <script>
 document.getElementById("yr").textContent = new Date().getFullYear();
 const SUPABASE_URL = "https://bmoicxrcyxbssgkfzahu.supabase.co", SUPABASE_ANON_KEY = "sb_publishable_qI60qVcNwEW6DUN4Bdztjw_lJaeuijY";
-const id = new URLSearchParams(location.search).get("s");
+const qs = new URLSearchParams(location.search), id = qs.get("s"), nref = qs.get("n");
 const esc = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+if (nref && !id) { const a = document.getElementById("openApp"); a.style.display = "inline-block"; a.href = "scholarhub://open?n=" + encodeURIComponent(nref); setTimeout(() => { location.href = a.href; }, 400); document.getElementById("tag").textContent = "Shared from the ScholarHub app"; }
 if (id) {
   // 1) hand off to the installed app via custom scheme (works even before Android verifies the https link)
   const a = document.getElementById("openApp"); a.style.display = "inline-block"; a.href = "scholarhub://open?s=" + encodeURIComponent(id);
