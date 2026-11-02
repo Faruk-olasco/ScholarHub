@@ -30,3 +30,4 @@ jobs:
           python crawler/run.py
           python crawler/news.py || true  # School News (Nigerian universities) + Tech Updates – separate tables, never blocks the scholarship crawl
           python crawler/jobs.py || true  # Jobs (entry-level / graduate / internship / NGO / remote) – own table
+          python crawler/details.py || true  # Details reader: organises each new listing (benefits / who can apply / how to apply...) from its page
