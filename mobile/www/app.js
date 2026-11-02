@@ -102,16 +102,58 @@ async function uploadCard(i) {
   const r = await fetch((window.SUPABASE_URL || "").replace(/\/$/, "") + "/storage/v1/object/cards/" + cardPath(i), { method: "POST", headers: { apikey: window.SUPABASE_ANON_KEY, Authorization: "Bearer " + window.SUPABASE_ANON_KEY, "Content-Type": "image/png", "x-upsert": "true" }, body: blob });
   if (!r.ok) throw new Error("card upload " + r.status);
 }
-function shareText(i) { return shareLink(i); } // link only: the chat app draws the ScholarHub card from the link (title, deadline, picture come from the site)
+// ---- Organised details (read by the crawler from the listing page; never invented). Standard sections, fixed order.
+const DETAIL_SECTIONS = {
+  s: [["about", "About", ""], ["benefits", "\ud83c\udf93 Benefits", "\u2705"], ["eligibility", "\ud83c\udf0d Who can apply", "\ud83c\udf0d"], ["documents", "\ud83d\udcc4 Documents required", "\ud83d\udcc4"], ["how_to_apply", "\ud83d\udcdd How to apply", "\ud83d\udcdd"]],
+  jobs: [["about", "About the role", ""], ["responsibilities", "\ud83d\udccb Responsibilities", "\ud83d\udd39"], ["requirements", "\u2705 Requirements", "\ud83d\udccc"], ["benefits", "\ud83c\udf81 Benefits", "\u2705"], ["how_to_apply", "\ud83d\udcdd How to apply", "\ud83d\udcdd"]],
+};
+const SHARE_SECTIONS = { s: ["benefits", "eligibility"], jobs: ["responsibilities", "requirements", "benefits"] }; // what goes into the WhatsApp text (approved layout)
+const detailsOf = (i) => (i._sec === "jobs" ? "jobs" : i._sec ? null : "s");
+const detailsCache = {};
+async function loadDetails(i) { // one small request per opened item, remembered for the session
+  const kind = detailsOf(i); if (!kind) return {};
+  if (i.details && typeof i.details === "object") return i.details;
+  if (detailsCache[i.id]) return (i.details = detailsCache[i.id]);
+  try { const r = await api("/" + (kind === "jobs" ? "jobs" : "scholarships") + "?select=details&id=eq." + encodeURIComponent(i.id)); i.details = (r.items[0] && r.items[0].details) || {}; } catch (e) { i.details = {}; }
+  return (detailsCache[i.id] = i.details);
+}
+function detailsHtml(i) {
+  const kind = detailsOf(i), d = i.details || {}; if (!kind) return "";
+  let h = "";
+  for (const [key, label] of DETAIL_SECTIONS[kind]) {
+    const v = d[key]; if (!v || (Array.isArray(v) && !v.length)) continue;
+    h += `<div class="dsec"><div class="dh">${label}</div>${Array.isArray(v) ? "<ul>" + v.map((b) => `<li>${esc(b)}</li>`).join("") + "</ul>" : `<p>${esc(v)}</p>`}</div>`;
+  }
+  return h ? h + '<div class="muted" style="font-size:12px;margin-top:8px">Organised from the listing page \u2013 always confirm on the official site.</div>' : "";
+}
+const longDate = (d) => { try { return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }); } catch (e) { return d; } };
+async function shareText(i) {
+  // WhatsApp-style post: bold headings, one emoji bullet per line, the ScholarHub link last (the chat app draws the card from the link)
+  const kind = detailsOf(i), link = shareLink(i);
+  if (!kind) return link;
+  const d = await loadDetails(i), isJob = kind === "jobs";
+  const lines = [(isJob ? "\ud83d\udcbc " : "\ud83c\udf93 ") + "*" + i.title + "*", ""];
+  for (const [key, label, bullet] of DETAIL_SECTIONS[kind]) {
+    if (!SHARE_SECTIONS[kind].includes(key) || !Array.isArray(d[key]) || !d[key].length) continue;
+    lines.push("*" + label.replace(/^\S+\s/, "") + ":*");
+    for (const b of d[key].slice(0, 5)) lines.push(bullet + " " + (b.length > 160 ? b.slice(0, 157).replace(/\s+\S*$/, "") + "\u2026" : b));
+    lines.push("");
+  }
+  if (i.deadline) { const days = Math.round((new Date(i.deadline) - new Date().setHours(0, 0, 0, 0)) / 864e5); lines.push("*" + (isJob ? "Closes" : "Deadline") + ":*", "\ud83d\udcc5 " + longDate(i.deadline) + (days > 1 ? " (" + days + " days left)" : days === 1 ? " (tomorrow)" : days === 0 ? " (today)" : ""), ""); }
+  else lines.push("*" + (isJob ? "Closes" : "Deadline") + ":*", "\ud83d\udfe2 Open \u2014 apply now", "");
+  lines.push("*Apply Now \ud83d\udd17:*", link, "", "Shared from the ScholarHub app");
+  return lines.join("\n");
+}
 let shareBusy = false;
 async function shareItem(i) {
   if (shareBusy) return; shareBusy = true;
   // Text + smart link only (no attached picture): WhatsApp, Telegram, X and Facebook then draw the big
   // tweet-style preview card themselves from the link (title, description and picture come from the site).
-  const text = shareText(i), title = i.title, dialogTitle = "Share";
+  const title = i.title, dialogTitle = "Share";
+  let text = shareLink(i);
   try {
-    // draw + upload the preview card first (best effort, max 8 s) so the chat app finds it when it reads the link
-    try { await Promise.race([uploadCard(i), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000))]); } catch (e) { console.warn("card", e); }
+    // draw + upload the preview card and fetch the organised details together (best effort, max 8 s)
+    try { const [, t] = await Promise.race([Promise.all([uploadCard(i), shareText(i)]), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000))]); text = t; } catch (e) { console.warn("card", e); try { text = await shareText(i); } catch (e2) {} }
     try { if (Share && Share.share) return await Share.share({ title, text, dialogTitle }); } catch (e) { if (/cancel/i.test(String(e && (e.message || e.code || e)))) return; }
     try { if (navigator.share) return await navigator.share({ title, text }); } catch (e) { if (/abort/i.test(String(e))) return; }
     try { await navigator.clipboard.writeText(text); alert("Copied"); } catch (e) { prompt("Copy", text); }
@@ -428,6 +470,7 @@ function openNewsDetail(i) {
     <div class="muted" style="margin:4px 0 10px">${whoLine(i)}via ${esc(i.source)} \u00b7 ${ago(i.published)}${pill}</div>
     ${sec === "jobs" ? (i.deadline ? deadlineHtml(i.deadline) : '<div class="dl ok">\ud83d\udfe2 Open \u2014 apply now (no closing date stated)</div>') : ""}
     <p>${esc(i.summary || (sec === "jobs" ? "Open the listing for the full description and how to apply." : "Open the full article to read more."))}</p>
+    <div id="dDetails">${sec === "jobs" ? detailsHtml(i) : ""}</div>
     <div class="muted" style="margin-top:6px;font-size:12px">${sec === "jobs" ? "\u2139\ufe0f Independent app \u2013 we list jobs from public job boards and never charge for applications. Beware of anyone asking for money to process a job. Apply only on the employer's or job board's page below." : `\u2139\ufe0f Summary collected automatically from ${esc(host || i.source)}. Read the full article on the source website.`}</div>
     ${detailSlot(i)}
     <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#0369a1">${esc(i.url)}</a></div>
@@ -438,6 +481,7 @@ function openNewsDetail(i) {
     </div>
     <div id="dNoteWrap"></div></div>`;
   $("#detail").classList.remove("hidden");
+  i._sec = sec; if (sec === "jobs") loadDetails(i).then(() => { const el = $("#dDetails"); if (el) el.innerHTML = detailsHtml(i); });
   $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
   $("#nOpen").onclick = () => openUrl(i.url);
   $("#nSave").onclick = () => { i._sec = sec; toggleSave(i); $("#nSave").textContent = saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"; };
@@ -671,6 +715,7 @@ function openDetail(i) {
   $("#detailBody").innerHTML = `<div class="detail">${mediaHtml(i, true)}
     <h2>${esc(i.title)}</h2>${deadlineHtml(i.deadline)}${tags(i)}
     <p>${esc(i.summary)}</p>
+    <div id="dDetails">${detailsHtml(i)}</div>
     <div class="muted">Source: ${esc(i.source)}${i.tier === "official" ? " (provider's own website)" : ""}</div>
     <div class="muted" style="margin-top:6px;font-size:12px">\u2139\ufe0f Independent app \u2013 not affiliated with any government, university or provider. Verify all details and apply only on the official page below.</div>
     ${detailSlot(i)}
@@ -682,6 +727,7 @@ function openDetail(i) {
     </div>
     <div id="dNoteWrap"></div></div>`;
   $("#detail").classList.remove("hidden");
+  loadDetails(i).then(() => { const el = $("#dDetails"); if (el) el.innerHTML = detailsHtml(i); });
   $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
   $("#dOpen").onclick = () => openUrl(i.url);
   $("#dShare").onclick = () => shareItem(i);
