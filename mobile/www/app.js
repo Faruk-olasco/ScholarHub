@@ -355,8 +355,9 @@ function buildQuery(offset) {
   if (state.tab === "soon") { p.set("deadline", "gte." + today()); p.append("deadline", "lte." + new Date(Date.now() + 21 * 864e5).toISOString().slice(0, 10)); }
   else if (state.dlFrom || state.dlTo) { if (state.dlFrom) p.append("deadline", "gte." + state.dlFrom); if (state.dlTo) p.append("deadline", "lte." + state.dlTo); } // a date range only makes sense for dated listings
   else if (!state.expired) p.set("or", `(deadline.is.null,deadline.gte.${today()})`);
-  // sort: cards with a real picture first (never in Closing soon), then dated & upcoming (soonest), then open-ended; newest first within
-  p.set("order", (state.tab === "soon" ? "" : "has_img.desc,") + "deadline.asc.nullslast,published.desc");
+  // sort: Closing soon = soonest deadline first; everywhere else the feed is MIXED - newest listings first (pictured cards first),
+  // whatever their deadline - so the home feed never looks like a wall of about-to-close calls (use Closing soon / filters to sort by date)
+  p.set("order", state.tab === "soon" ? "deadline.asc.nullslast,published.desc" : "has_img.desc,published.desc,deadline.asc.nullslast");
   p.set("limit", 30); p.set("offset", offset);
   return "/scholarships?" + p.toString();
 }
