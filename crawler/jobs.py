@@ -39,6 +39,7 @@ from supabase import create_client
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import media
+import details as det   # organises the post's own description into Requirements / Benefits / How to apply
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("jobs")
@@ -411,6 +412,61 @@ def from_feed(name, url, feed_kind):
 
 
 # ---------------------------------------------------------------------------------------------
+# ReviceMyCv Jobs (jobs.revicemycv.com) - Nigerian board with a public JSON API: title, employer, location, salary,
+# post type, the employer's official apply link, a picture and a description that already has Requirements /
+# Benefits / How to apply headings. We keep the official link as the job's URL (so "Apply on site" goes to the
+# employer) and organise the description straight into `details`, because the board's own pages are app-rendered.
+# ---------------------------------------------------------------------------------------------
+RMC_API = "https://jobs.revicemycv.com/api/get-jobs.php?page={page}"
+RMC_PAGES = int(os.environ.get("RMC_PAGES", "3"))      # 10 posts per page, newest first
+def from_revicemycv():
+    out = []
+    for page in range(1, RMC_PAGES + 1):
+        try:
+            data = get(RMC_API.format(page=page)).json().get("data") or []
+        except Exception as e:
+            log.warning("ReviceMyCv page %d: %s", page, e); break
+        if not data: break
+        for j in data:
+            if str(j.get("is_active", "True")).lower() not in ("true", "1"): continue
+            title = clean(j.get("title") or ""); slug = (j.get("slug") or "").strip()
+            if len(title) < 8 or not slug or NOISE.search(title): continue
+            page_url = "https://jobs.revicemycv.com/job/" + slug
+            link = (j.get("redirect_url") or "").strip()
+            if not re.match(r"https?://", link) or re.search(r"revicemycv\.com|whatsapp|t\.me|bit\.ly", link, re.I): link = page_url
+            desc_html = j.get("description") or ""
+            desc = clean(desc_html)
+            summ = clean(re.split(r"</p>", desc_html, 1)[0])[:600] if "</p>" in desc_html else desc[:600]
+            try: pub = dparser.parse(j.get("created_at")).replace(tzinfo=UTC)
+            except Exception: pub = datetime.now(UTC)
+            if pub < datetime.now(UTC) - timedelta(days=KEEP_UNDATED_DAYS): continue
+            dl = None
+            m = re.search(r"(?:Application )?(?:Deadline|Closing Date|Apply before|Expires?|Closes)\s*:?\s*([0-9]{1,2}(?:st|nd|rd|th)?,?\s+[A-Za-z]+,?\s+20\d\d|[A-Za-z]+\s+[0-9]{1,2}(?:st|nd|rd|th)?,?\s+20\d\d|20\d\d-\d\d-\d\d)", desc, re.I)
+            if m: dl = parse_day(m.group(1))
+            company = clean(j.get("company") or "")[:100] or "See listing"
+            loc = clean(j.get("location") or "Nigeria")
+            loc = "Remote" if re.search(r"remote", loc, re.I) else re.split(r"[,(]", loc)[0].strip()[:40] or "Nigeria"
+            text = title + " " + (j.get("contract_type") or "") + " " + (j.get("post_type") or "") + " " + summ[:300]
+            kind = kind_of(text)
+            if (j.get("post_type") or "").lower() == "internship": kind = "internship"
+            try:
+                sections, _ = det.read_sections(desc_html, "jobs")
+                sections.pop("_deadline_txt", None)
+                promo = re.compile(r"revicemycv|your cv|cv (review|writing|revamp)|fix it now|shortlisted starts", re.I)   # the board's own CV-service plugs
+                dets = {k: ([b for b in v if not promo.search(b)] if isinstance(v, list) else v) for k, v in sections.items() if k in det.ORDER["jobs"]}
+                dets = {k: v for k, v in dets.items() if v}
+            except Exception:
+                dets = {}
+            dets["at"] = datetime.now(UTC).isoformat(); dets["src"] = page_url
+            img = (j.get("image_url") or "").strip()
+            out.append({"id": jid(page_url), "title": title[:160], "summary": summ, "url": link, "source": "ReviceMyCv Jobs", "tier": "board",
+                        "company": company, "location": loc, "kind": kind, "deadline": dl, "published": pub.isoformat(),
+                        "industry": clean(j.get("category") or "")[:60] or None, "details": dets,
+                        "_image": img if re.match(r"https?://", img) else None})
+    return out
+
+
+# ---------------------------------------------------------------------------------------------
 # Job page: closing date + schema.org JobPosting (+ employer logo if the page carries one)
 # ---------------------------------------------------------------------------------------------
 GENERIC_LOGO = re.compile(r"/(company/|employer/|uploads/)?(logo|default|placeholder|no[-_]?logo|company|employer|blank)\.(png|jpe?g|webp)(\?|$)", re.I)
@@ -483,7 +539,7 @@ def finish_row(r):
         except Exception as e:
             log.debug("logo %s: %s", r["company"], e)
     r["logo"] = logo
-    r["image"] = None           # job pages never carry a genuine picture of the job; boards only have promo graphics
+    r["image"] = r.pop("_image", None)   # only a picture the source attached to this very post; job pages themselves never carry one
     r["media_checked"] = datetime.now(UTC).isoformat()
     return r
 
@@ -495,6 +551,10 @@ def main():
         for fut in as_completed([ex.submit(from_feed, n, u, k) for n, u, k in FEEDS]):
             got = fut.result(); rows.extend(got)
             if got: log.info("%-26s %3d kept", got[0]["source"], len(got))
+    try:
+        got = from_revicemycv(); rows.extend(got); log.info("%-26s %3d kept", "ReviceMyCv Jobs", len(got))
+    except Exception as e:
+        log.warning("ReviceMyCv: %s", e)
     # employer watch list (official adverts straight from the institution's own website)
     sources = load_sources()
     if sources:
@@ -521,7 +581,7 @@ def main():
     with ThreadPoolExecutor(6) as ex:
         list(ex.map(finish_row, todo))
     now = datetime.now(UTC).isoformat()
-    for r in new_rows: r["first_seen"] = now; r["last_seen"] = now; r.pop("_logo", None)
+    for r in new_rows: r["first_seen"] = now; r["last_seen"] = now; r.pop("_logo", None); r.pop("_image", None)
     # PostgREST needs identical keys per batch -> group by key-set
     groups = {}
     for r in new_rows: groups.setdefault(tuple(sorted(r.keys())), []).append(r)
