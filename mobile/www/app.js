@@ -440,7 +440,7 @@ function spreadEmployers(items) { // in-place: when two neighbours share an empl
   }
 }
 const SEC_LABEL = { news: "\ud83c\udfeb School News", tech: "\ud83d\udcbb Tech", jobs: "\ud83d\udcbc Job" };
-const STAR_IMG = 'style="background:rgba(255,255,255,.88);border-radius:50%;width:34px;height:34px;line-height:26px;text-align:center;color:#475569;top:8px;right:8px"'; // over a picture: white circle like scholarship cards
+const STAR_IMG = 'style="background:rgba(255,255,255,.88);border-radius:50%;width:34px;height:34px;line-height:26px;text-align:center;top:8px;right:8px"'; // over a picture: white circle like scholarship cards (colour comes from CSS so the saved star turns gold)
 function newsCardHtml(i, sec, isNew) { // one card for School News / Tech Updates / Jobs (also used inside Saved)
   const t = NEWS_TABS[sec] || NEWS_TABS.news;
   const img = hasMedia(i), pr = img ? 'style="right:50px"' : 'style="right:44px"'; // make room for the \u2605 at the top-right
@@ -476,7 +476,7 @@ function openNewsDetail(i) {
     ${detailSlot(i)}
     <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#0369a1">${esc(i.url)}</a></div>
     <div class="actions">
-      <button class="ghost" id="nSave">${saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"}</button>
+      <button class="ghost save-btn${saved.has(i.id) ? " on" : ""}" id="nSave" data-save="${esc(i.id)}">${saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"}</button>
       <button class="ghost" id="nShare">Share</button>
       <button id="nOpen">${NEWS_TABS[sec].open || "Read full article \u2197"}</button>
     </div>
@@ -485,7 +485,7 @@ function openNewsDetail(i) {
   i._sec = sec; if (sec === "jobs") loadDetails(i).then(() => { const el = $("#dDetails"); if (el) el.innerHTML = detailsHtml(i); });
   $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
   $("#nOpen").onclick = () => openUrl(i.url);
-  $("#nSave").onclick = () => { i._sec = sec; toggleSave(i); $("#nSave").textContent = saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"; };
+  $("#nSave").onclick = () => { i._sec = sec; toggleSave(i); };
   i._sec = sec; attachNoteBox(i, "#nSave");
   $("#nShare").onclick = () => shareItem(i);
 }
@@ -722,7 +722,7 @@ function openDetail(i) {
     ${detailSlot(i)}
     <div class="muted" style="word-break:break-all;margin-top:4px"><a href="${esc(i.url)}" data-open="${esc(i.url)}" style="color:#0369a1">${esc(i.url)}</a></div>
     <div class="actions">
-      <button class="ghost" id="dSave">${saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"}</button>
+      <button class="ghost save-btn${saved.has(i.id) ? " on" : ""}" id="dSave" data-save="${esc(i.id)}">${saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"}</button>
       <button class="ghost" id="dShare">Share</button>
       <button id="dOpen">Apply / Details \u2197</button>
     </div>
@@ -732,7 +732,7 @@ function openDetail(i) {
   $("#detailBody").querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openUrl(a.dataset.open); }));
   $("#dOpen").onclick = () => openUrl(i.url);
   $("#dShare").onclick = () => shareItem(i);
-  $("#dSave").onclick = () => { toggleSave(i); $("#dSave").textContent = saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"; };
+  $("#dSave").onclick = () => { toggleSave(i); };
   attachNoteBox(i, "#dSave");
 }
 function attachNoteBox(i, saveSel) { // "Add to plan" + personal note, shared by scholarship and job/news sheets
@@ -748,7 +748,7 @@ function attachNoteBox(i, saveSel) { // "Add to plan" + personal note, shared by
     if (editing) {
       $("#dNote").focus();
       $("#dNoteCancel").onclick = () => renderNoteBox(false);
-      $("#dNoteSave").onclick = () => { const v = $("#dNote").value.trim(); if (v) { notes[i.id] = v; if (!savedItems[i.id]) { if (!i._sec && NEWS_TABS[state.tab]) i._sec = state.tab; savedItems[i.id] = i; saved.add(i.id); localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems)); $(saveSel).textContent = "\u2605 Saved"; } } else delete notes[i.id]; savePlan(); renderNoteBox(false); $("#dNoteSaved").textContent = v ? "Note saved \u2713 \u2014 see Plan \u2192 Opportunity notes" : planCount(i.id); };
+      $("#dNoteSave").onclick = () => { const v = $("#dNote").value.trim(); if (v) { notes[i.id] = v; if (!savedItems[i.id]) { if (!i._sec && NEWS_TABS[state.tab]) i._sec = state.tab; savedItems[i.id] = i; saved.add(i.id); localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems)); $(saveSel).textContent = "\u2605 Saved"; $(saveSel).classList.add("on"); } } else delete notes[i.id]; savePlan(); renderNoteBox(false); $("#dNoteSaved").textContent = v ? "Note saved \u2713 \u2014 see Plan \u2192 Opportunity notes" : planCount(i.id); };
     } else {
       $("#dNoteBtn").onclick = () => renderNoteBox(true);
       $("#dPlan").onclick = () => { const text = prompt("Task for \u201c" + i.title.slice(0, 40) + "\u2026\u201d", "Apply: " + i.title.slice(0, 60)); if (text === null) return; addTask(text, i.deadline || "", i); $("#dNoteSaved").textContent = planCount(i.id) + " \u00b7 added to Daily plan \u2713"; };
@@ -762,6 +762,7 @@ function toggleSave(i) {
   if (saved.has(i.id)) { saved.delete(i.id); delete savedItems[i.id]; } else { saved.add(i.id); savedItems[i.id] = i; }
   localStorage.setItem("saved", JSON.stringify([...saved])); localStorage.setItem("savedItems", JSON.stringify(savedItems));
   document.querySelectorAll(`[data-star="${i.id}"]`).forEach((b) => b.classList.toggle("on", saved.has(i.id)));
+  document.querySelectorAll(`[data-save="${i.id}"]`).forEach((b) => { b.classList.toggle("on", saved.has(i.id)); b.textContent = saved.has(i.id) ? "\u2605 Saved" : "\u2606 Save"; }); // the Save button inside the open card turns gold too
   if (saved.has(i.id)) scheduleDeadline(i); else cancelDeadline(i.id);
 }
 
