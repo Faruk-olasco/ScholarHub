@@ -3,6 +3,9 @@
   "target": {
     "namespace": "android_app",
     "package_name": "com.scholarhub.app",
-    "sha256_cert_fingerprints": ["3A:E0:7E:0D:88:E9:31:89:49:7D:82:09:D1:3D:7A:6B:0D:DE:DB:AE:5A:C6:D5:B1:E3:63:5C:35:14:7B:95:6E"]
+    "sha256_cert_fingerprints": [
+      "0F:E5:86:DF:CA:AB:75:39:27:00:EB:E1:4C:FE:FF:B8:72:A2:88:56:01:FA:81:B0:EF:69:02:05:0B:3B:D1:EF",
+      "3A:E0:7E:0D:88:E9:31:89:49:7D:82:09:D1:3D:7A:6B:0D:DE:DB:AE:5A:C6:D5:B1:E3:63:5C:35:14:7B:95:6E"
+    ]
   }
 }]
